@@ -1,151 +1,140 @@
-// Hand Gesture Recognition: Open and Closed Hand using Handpose & Fingerpose
-let handposeModel, handGestureEstimator, gesturePanelActive = false;
-
-// Emoji mapping
-const gestureEmojis = {
-    hand_open: '🖐️',
-    hand_closed: '✊',
-};
-
-// Open hand: All fingers straight
-function createHandOpenGesture() {
-    const fp = window.fp;
-    const handOpen = new fp.GestureDescription('hand_open');
-    for (let finger of [fp.Finger.Thumb, fp.Finger.Index, fp.Finger.Middle, fp.Finger.Ring, fp.Finger.Pinky]) {
-        handOpen.addCurl(finger, fp.FingerCurl.NoCurl, 1.0);
-        handOpen.addCurl(finger, fp.FingerCurl.HalfCurl, 0.1); // allow a little curl
+class HandTracker {
+    constructor() {
+        this.model = null;
+        this.videoElement = null;
+        this.isTracking = false;
+        this.animationId = null;
+        this.keypoints = null;
+        this._shapeLogged = false;
     }
-    return handOpen;
-}
 
-// Closed hand : All fingers curled
-function createHandClosedGesture() {
-    const fp = window.fp;
-    const handClosed = new fp.GestureDescription('hand_closed');
-    for (let finger of [fp.Finger.Thumb, fp.Finger.Index, fp.Finger.Middle, fp.Finger.Ring, fp.Finger.Pinky]) {
-        handClosed.addCurl(finger, fp.FingerCurl.FullCurl, 1.0);
-        handClosed.addCurl(finger, fp.FingerCurl.HalfCurl, 0.9);
-    }
-    return handClosed;
-}
-
-// Setup handpose/fingerpose and register gestures
-async function setupHandpose() {
-    const spinner = document.getElementById('handLoading');
-    if (!handposeModel) {
+    async init(modelPath, videoElementId) {
+        this.videoElement = document.getElementById(videoElementId);
+        const spinner = document.getElementById('handLoading');
         if (spinner) spinner.style.display = 'block';
-        handposeModel = await handpose.load();
-        if (spinner) spinner.style.display = 'none';
-    }
-    if (!handGestureEstimator) {
-        handGestureEstimator = new fp.GestureEstimator([
-            createHandOpenGesture(),
-            createHandClosedGesture(),
-        ]);
-    }
-}
 
-// Detect and draw gestures
-async function runGestureDetection() {
-    const video = document.getElementById('webcam');
-    const canvas = document.getElementById('gestureCanvas');
-    const gestureStatus = document.getElementById('gestureStatus');
-    const ctx = canvas.getContext('2d');
+        try {
+            console.log("Loading YOLO model from:", modelPath);
+            this.model = await tf.loadGraphModel(modelPath);
+            console.log("Model input shape:", this.model.inputs[0].shape);
+            console.log("Model loaded successfully!");
+            if (spinner) spinner.style.display = 'none';
 
-    if (!gesturePanelActive) return;
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 640 }
+            });
+            this.videoElement.srcObject = stream;
 
-    if (video.readyState < 2) {
-        requestAnimationFrame(runGestureDetection);
-        return;
-    }
+            return new Promise((resolve) => {
+                this.videoElement.onloadedmetadata = () => {
+                    this.videoElement.play();
+                    this.isTracking = true;
+                    console.log("Webcam started. Ready for inference.");
+                    this.detectFrame();
+                    resolve(true);
+                };
+            });
 
-    ctx.save();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const predictions = await handposeModel.estimateHands(video);
-    if (predictions.length > 0) {
-        const keypoints = predictions[0].landmarks;
-        ctx.fillStyle = '#32b8c6';
-        for (let i = 0; i < keypoints.length; i++) {
-            const [x, y] = keypoints[i];
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, Math.PI * 2);
-            ctx.fill();
+        } catch (error) {
+            console.error("Error initializing HandTracker:", error);
+            if (spinner) spinner.style.display = 'none';
+            return false;
         }
+    }
 
-        // Lower threshold for better detection
-        const { gestures } = handGestureEstimator.estimate(keypoints, 5.0);
-        if (gestures && gestures.length > 0) {
-            let best = gestures.reduce((a, b) => (a.score > b.score ? a : b));
-            if (best.score > 5.0 && gestureEmojis[best.name]) {
-                gestureStatus.textContent = gestureEmojis[best.name];
-                // Control visualization
-                if (window.viewer && window.viewer.controls) {
-                    if (best.name === 'hand_open') {
-                        window.viewer.controls.autoRotate = true;
-                        window.viewer.controls.autoRotateSpeed = 2.0;
-                    }
-                    if (best.name === 'hand_closed') {
-                        window.viewer.controls.autoRotate = false;
-                    }
-                }
+    detectFrame() {
+        if (!this.isTracking) return;
+
+        let inputTensor = null;
+        let rawOutput = null;
+
+        try {
+            // Build [1, 640, 640, 3] input
+            const img = tf.browser.fromPixels(this.videoElement);
+            const resized = tf.image.resizeBilinear(img, [640, 640]);
+            const casted = tf.cast(resized, 'float32');
+            const normalized = tf.div(casted, tf.scalar(255.0));
+            inputTensor = tf.expandDims(normalized, 0);
+            img.dispose(); resized.dispose(); casted.dispose(); normalized.dispose();
+
+            // Execute model
+            rawOutput = this.model.execute({ 'x': inputTensor });
+
+            // Resolve output to a single tensor regardless of return type
+            let outputTensor;
+            if (rawOutput instanceof tf.Tensor) {
+                outputTensor = rawOutput;
+            } else if (Array.isArray(rawOutput)) {
+                outputTensor = rawOutput.find(t => t.shape.length === 3) || rawOutput[0];
             } else {
-                gestureStatus.textContent = '';
+                // NamedTensorMap - take first value
+                outputTensor = Object.values(rawOutput)[0];
             }
-        } else {
-            gestureStatus.textContent = '';
-        }
-    } else {
-        gestureStatus.textContent = '';
-    }
-    ctx.restore();
 
-    requestAnimationFrame(runGestureDetection);
+            if (!this._shapeLogged) {
+                console.log("Output tensor shape:", outputTensor.shape);
+                this._shapeLogged = true;
+            }
+
+            // outputTensor shape is [1, 68, 8400]
+            // We need to work on it using tf functions (not .slice on a non-Tensor)
+            // Squeeze batch dim -> [68, 8400]
+            const data = outputTensor.dataSync();
+            const rows = outputTensor.shape[1];   // 68
+            const cols = outputTensor.shape[2];   // 8400
+
+            // Find best anchor by scanning row 4 (class scores)
+            let bestScore = 0;
+            let bestIndex = 0;
+            for (let c = 0; c < cols; c++) {
+                const score = data[4 * cols + c];
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestIndex = c;
+                }
+            }
+
+            if (bestScore > 0.5) {
+                const pts = [];
+                for (let i = 0; i < 21; i++) {
+                    pts.push({
+                        x: data[(5 + i * 3) * cols + bestIndex],
+                        y: data[(5 + i * 3 + 1) * cols + bestIndex],
+                        conf: data[(5 + i * 3 + 2) * cols + bestIndex]
+                    });
+                }
+                this.keypoints = pts;
+                console.log("Hand detected! Point 9 X:", Math.round(pts[9].x), "Y:", Math.round(pts[9].y));
+            } else {
+                this.keypoints = null;
+            }
+
+        } catch (error) {
+            console.error("Inference Error:", error.message);
+        } finally {
+            if (inputTensor) inputTensor.dispose();
+            if (rawOutput) {
+                if (rawOutput instanceof tf.Tensor) rawOutput.dispose();
+                else if (Array.isArray(rawOutput)) rawOutput.forEach(t => t.dispose());
+                else Object.values(rawOutput).forEach(t => t.dispose());
+            }
+        }
+
+        this.animationId = requestAnimationFrame(() => this.detectFrame());
+    }
+
+    stop() {
+        this.isTracking = false;
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+        if (this.videoElement && this.videoElement.srcObject) {
+            this.videoElement.srcObject.getTracks().forEach(track => track.stop());
+            this.videoElement.srcObject = null;
+        }
+        console.log("Hand tracking stopped.");
+    }
 }
 
-// Toggle hand gesture panel and webcam
-document.getElementById('handControlBtn').addEventListener('click', async function() {
-    const panel = document.getElementById('handGesturePanel');
-    gesturePanelActive = !gesturePanelActive;
-
-    if (gesturePanelActive) {
-        this.textContent = '🛑 Stop Hand Control';
-        panel.style.display = 'block';
-
-        const video = document.getElementById('webcam');
-        if (!video.srcObject) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                video.srcObject = stream;
-                await new Promise((resolve) => { video.onloadedmetadata = resolve; });
-                video.play();
-            } catch (error) {
-                alert('Camera access denied. Please allow camera permissions.');
-                gesturePanelActive = false;
-                this.textContent = '🖐️ Hand Control';
-                panel.style.display = 'none';
-                return;
-            }
-        }
-
-        await setupHandpose();
-        runGestureDetection();
-    } else {
-        this.textContent = '🖐️ Hand Control';
-        panel.style.display = 'none';
-
-        const video = document.getElementById('webcam');
-        if (video && video.srcObject) {
-            video.srcObject.getTracks().forEach((track) => track.stop());
-            video.srcObject = null;
-        }
-        document.getElementById('gestureStatus').textContent = '';
-        const canvas = document.getElementById('gestureCanvas');
-        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-
-        // Always stop auto-rotation when hand gesture is off
-        if (window.viewer && window.viewer.controls) {
-            window.viewer.controls.autoRotate = false;
-        }
-    }
-});
+window.HandTracker = HandTracker;

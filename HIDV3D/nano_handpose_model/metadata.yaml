@@ -1,0 +1,47 @@
+description: Ultralytics YOLO11n-pose model trained on /usr/local/lib/python3.12/dist-packages/ultralytics/cfg/datasets/hand-keypoints.yaml
+author: Ultralytics
+date: '2026-04-10T21:58:29.043096'
+version: 8.4.37
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: pose
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: hand
+args:
+  batch: 1
+  half: false
+  int8: false
+  nms: false
+channels: 3
+end2end: false
+kpt_shape:
+- 21
+- 3
+kpt_names:
+  0:
+  - wrist
+  - thumb_cmc
+  - thumb_mcp
+  - thumb_ip
+  - thumb_tip
+  - index_mcp
+  - index_pip
+  - index_dip
+  - index_tip
+  - middle_mcp
+  - middle_pip
+  - middle_dip
+  - middle_tip
+  - ring_mcp
+  - ring_pip
+  - ring_dip
+  - ring_tip
+  - pinky_mcp
+  - pinky_pip
+  - pinky_dip
+  - pinky_tip

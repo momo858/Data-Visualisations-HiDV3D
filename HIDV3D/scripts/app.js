@@ -6,8 +6,10 @@ document.addEventListener("DOMContentLoaded", function () {
   let parsedCsvData = null;
   let columnDetector = null;
   const viewer = new CSV3DViewer("view3d");
-  window.viewer = viewer; // Add this line
-
+  window.viewer = viewer; 
+  window.handTracker = new HandTracker();
+  let gesturePanelActive = false;
+  
   const uploadBtn = document.getElementById("uploadBtn");
   const csvInput = document.getElementById("csvInput");
   const visualizeBtn = document.getElementById("visualizeBtn");
@@ -102,17 +104,36 @@ document.addEventListener("DOMContentLoaded", function () {
     viewer.visualizeData(parsedCsvData, xCol, yCol, zCol);
   });
 
-  resetBtn.addEventListener("click", () => {
-    parsedCsvData = null;
-    columnDetector = null;
-    viewer.clearScene();
-    columnSelector.classList.remove("visible");
-    dataInfo.style.display = "none";
-    document.getElementById("legend").style.display = "none";
-    visualizeBtn.disabled = true;
-    resetBtn.disabled = true;
-    csvInput.value = "";
-    console.log("Reset complete");
+const handControlBtn = document.getElementById('handControlBtn');
+
+  handControlBtn.addEventListener('click', async function() {
+      const panel = document.getElementById('handGesturePanel');
+      const video = document.getElementById('webcam'); // ID matches your index.html
+      
+      gesturePanelActive = !gesturePanelActive;
+      
+      if (gesturePanelActive) {
+          // TURN ON hand tracking
+          this.textContent = "Stop Hand Control";
+          panel.style.display = "block";
+          
+          // Use the exact model path we found
+          const modelPath = './nano_handpose_model/model.json';
+          
+          // Pass the path and the ID of the video element
+          await window.handTracker.init(modelPath, 'webcam');
+          
+      } else {
+          // TURN OFF hand tracking
+          this.textContent = "Hand Control";
+          panel.style.display = "none";
+          
+          // Call the stop method we wrote in HandTrack.js
+          window.handTracker.stop();
+          
+          // Clear status text
+          document.getElementById('gestureStatus').textContent = "";
+      }
   });
 
   console.log("HIDV3D Universal CSV Visualizer initialized!");
