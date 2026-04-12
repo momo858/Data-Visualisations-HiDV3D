@@ -169,57 +169,58 @@ class CSV3DViewer {
   }
 
     applyGesture(result) {
-      try {
-          if (!result || result.gesture === "none") return;
-          if (!this.camera || !this.controls) {
-              console.warn("CSV3DViewer applyGesture: camera or controls not ready");
-              return;
-          }
+        try {
+            if (!result || result.gesture === "none") return;
+            if (!this.camera || !this.controls) {
+                console.warn("CSV3DViewer applyGesture: camera or controls not ready");
+                return;
+            }
 
-          if (result.gesture === "palm") {
-              // Rotate the scene left/right based on hand deltaX
-              const sensitivity = 0.005;
-              const angle = result.deltaX * sensitivity;
-              // Rotate camera position around the Y axis (orbit around origin)
-              const camPos = this.camera.position;
-              const cos = Math.cos(angle);
-              const sin = Math.sin(angle);
-              const newX = camPos.x * cos + camPos.z * sin;
-              const newZ = -camPos.x * sin + camPos.z * cos;
-              this.camera.position.set(newX, camPos.y, newZ);
-              this.camera.lookAt(0, 0, 0);
-              this.controls.update();
-              console.log("Gesture: rotate deltaX", Math.round(result.deltaX));
-          }
+            if (result.gesture === "palm") {
+                // Use OrbitControls azimuth angle to rotate — no camera position fighting
+                const sensitivity = 0.005;
+                const angle = result.deltaX * sensitivity;
+                const current = this.controls.getAzimuthalAngle();
+                this.controls.minAzimuthAngle = current + angle;
+                this.controls.maxAzimuthAngle = current + angle;
+                this.controls.update();
+                // Remove the lock after applying so user can still drag manually
+                this.controls.minAzimuthAngle = -Infinity;
+                this.controls.maxAzimuthAngle = Infinity;
+                console.log("Gesture: rotate deltaX", Math.round(result.deltaX));
+            }
 
-          else if (result.gesture === "fingers_together") {
-              // Zoom in — move camera closer to origin
-              const zoomSpeed = 0.05;
-              const direction = this.camera.position.clone().normalize();
-              const currentDist = this.camera.position.length();
-              if (currentDist > this.controls.minDistance) {
-                  this.camera.position.addScaledVector(direction, -zoomSpeed);
-                  this.controls.update();
-                  console.log("Gesture: zoom in, dist", currentDist.toFixed(2));
-              }
-          }
+            else if (result.gesture === "fingers_together") {
+                // Zoom in — move camera closer to origin
+                const zoomSpeed = 0.15;
+                const direction = this.camera.position.clone().normalize();
+                const currentDist = this.camera.position.length();
+                if (currentDist > this.controls.minDistance) {
+                    this.camera.position.addScaledVector(direction, -zoomSpeed);
+                    this.controls.target.set(0, 0, 0);
+                    this.controls.update();
+                    console.log("Gesture: zoom in, dist", currentDist.toFixed(2));
+                }
+            }
 
-          else if (result.gesture === "fist") {
-              // Zoom out — move camera further from origin
-              const zoomSpeed = 0.05;
-              const direction = this.camera.position.clone().normalize();
-              const currentDist = this.camera.position.length();
-              if (currentDist < this.controls.maxDistance) {
-                  this.camera.position.addScaledVector(direction, zoomSpeed);
-                  this.controls.update();
-                  console.log("Gesture: zoom out, dist", currentDist.toFixed(2));
-              }
-          }
+            else if (result.gesture === "fist") {
+                // Zoom out — move camera further from origin
+                const zoomSpeed = 0.15;
+                const direction = this.camera.position.clone().normalize();
+                const currentDist = this.camera.position.length();
+                if (currentDist < this.controls.maxDistance) {
+                    this.camera.position.addScaledVector(direction, zoomSpeed);
+                    this.controls.target.set(0, 0, 0);
+                    this.controls.update();
+                    console.log("Gesture: zoom out, dist", currentDist.toFixed(2));
+                }
+            }
 
-      } catch (err) {
-          console.error("CSV3DViewer applyGesture() error:", err.message);
-      }
-  }
+        } catch (err) {
+            console.error("CSV3DViewer applyGesture() error:", err.message);
+        }
+    }
+
 
 
   updateLegend(xCol, yCol, zCol) {
