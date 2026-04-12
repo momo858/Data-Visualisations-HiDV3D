@@ -108,6 +108,10 @@ class HandTracker {
             } else {
                 this.keypoints = null;
             }
+            if (window.gestureRecognizer && window.viewer) {
+                const result = window.gestureRecognizer.classify(this.keypoints);
+                window.viewer.applyGesture(result);
+            }
 
         } catch (error) {
             console.error("Inference Error:", error.message);

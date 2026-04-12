@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const viewer = new CSV3DViewer("view3d");
   window.viewer = viewer; 
   window.handTracker = new HandTracker();
+  window.gestureRecognizer = new GestureRecognizer();
   let gesturePanelActive = false;
   
   const uploadBtn = document.getElementById("uploadBtn");
