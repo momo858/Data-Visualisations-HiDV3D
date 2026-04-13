@@ -8,8 +8,8 @@ class GestureRecognizer {
     this._frameCentre = 320;
 
     this.stillFrames = 0;
-    this._stillThreshold = 3;
-    this._motionCutoff = 9;
+    this._stillThreshold = 12;
+    this._motionCutoff = 6;
   }
 
   dist(a, b) {
