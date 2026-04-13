@@ -16,10 +16,8 @@ class CSV3DViewer {
 
   initScene() {
     this.container.innerHTML = "";
-
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x1a1a1a);
-
     this.camera = new THREE.PerspectiveCamera(
       60,
       this.container.offsetWidth / this.container.offsetHeight,
@@ -29,41 +27,32 @@ class CSV3DViewer {
     this.camera.position.set(12, 12, 12);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setSize(
-      this.container.offsetWidth,
-      this.container.offsetHeight
-    );
+    this.renderer.setSize(this.container.offsetWidth, this.container.offsetHeight);
     this.renderer.shadowMap.enabled = true;
     this.container.appendChild(this.renderer.domElement);
 
-    // Enhanced lighting
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     this.scene.add(ambientLight);
-
     const light1 = new THREE.DirectionalLight(0xffffff, 0.6);
     light1.position.set(10, 10, 5);
     this.scene.add(light1);
-
     const light2 = new THREE.DirectionalLight(0x8888ff, 0.3);
     light2.position.set(-10, -10, -5);
     this.scene.add(light2);
 
-    // Add axes helper
     const axesHelper = new THREE.AxesHelper(10);
     this.scene.add(axesHelper);
-
-    // Add grid
     const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
     this.scene.add(gridHelper);
 
-    this.controls = new THREE.OrbitControls(
-      this.camera,
-      this.renderer.domElement
-    );
+    this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
     this.controls.maxDistance = 50;
     this.controls.minDistance = 5;
+    // Clamp vertical tilt so camera can't flip upside down
+    this.controls.minPolarAngle = 0.2;
+    this.controls.maxPolarAngle = Math.PI - 0.2;
 
     window.addEventListener("resize", this.onWindowResize.bind(this));
     this.animate();
@@ -79,13 +68,9 @@ class CSV3DViewer {
 
   onWindowResize() {
     if (!this.camera || !this.renderer) return;
-    this.camera.aspect =
-      this.container.offsetWidth / this.container.offsetHeight;
+    this.camera.aspect = this.container.offsetWidth / this.container.offsetHeight;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(
-      this.container.offsetWidth,
-      this.container.offsetHeight
-    );
+    this.renderer.setSize(this.container.offsetWidth, this.container.offsetHeight);
   }
 
   clearScene() {
@@ -105,7 +90,6 @@ class CSV3DViewer {
 
   visualizeData(data, xCol, yCol, zCol) {
     this.clearScene();
-
     if (!data || data.length === 0) {
       console.warn("No data to visualize");
       return;
@@ -113,26 +97,19 @@ class CSV3DViewer {
 
     this.currentMapping = { x: xCol, y: yCol, z: zCol };
 
-    // Map columns to numeric values
     const xValues = this.dataMapper.mapToNumeric(data, xCol);
     const yValues = this.dataMapper.mapToNumeric(data, yCol);
     const zValues = this.dataMapper.mapToNumeric(data, zCol);
 
-    // Normalize values
-    const xMin = Math.min(...xValues),
-      xMax = Math.max(...xValues);
-    const yMin = Math.min(...yValues),
-      yMax = Math.max(...yValues);
-    const zMin = Math.min(...zValues),
-      zMax = Math.max(...zValues);
+    const xMin = Math.min(...xValues), xMax = Math.max(...xValues);
+    const yMin = Math.min(...yValues), yMax = Math.max(...yValues);
+    const zMin = Math.min(...zValues), zMax = Math.max(...zValues);
 
     const xRange = xMax - xMin || 1;
     const yRange = yMax - yMin || 1;
     const zRange = zMax - zMin || 1;
-
     const scale = 10;
 
-    // Create point cloud
     data.forEach((row, index) => {
       const x = ((xValues[index] - xMin) / xRange - 0.5) * scale;
       const y = ((yValues[index] - yMin) / yRange - 0.5) * scale;
@@ -140,7 +117,6 @@ class CSV3DViewer {
 
       const size = Math.max(0.05, 0.2 / Math.sqrt(data.length));
       const geometry = new THREE.SphereGeometry(size, 8, 8);
-
       const hue = index / data.length;
       const color = new THREE.Color().setHSL(hue, 0.8, 0.6);
       const material = new THREE.MeshPhongMaterial({
@@ -150,78 +126,86 @@ class CSV3DViewer {
         emissive: color,
         emissiveIntensity: 0.2,
       });
-
       const sphere = new THREE.Mesh(geometry, material);
       sphere.position.set(x, y, z);
       sphere.userData = { rowData: row, index: index };
-
       this.scene.add(sphere);
       this.objects.push(sphere);
     });
 
     this.camera.position.set(scale * 1.5, scale * 1.5, scale * 1.5);
     this.camera.lookAt(0, 0, 0);
-
-    console.log(
-      `Visualized ${data.length} points across ${xCol}, ${yCol}, ${zCol}`
-    );
+    console.log(`Visualized ${data.length} points across ${xCol}, ${yCol}, ${zCol}`);
     this.updateLegend(xCol, yCol, zCol);
   }
 
-    applyGesture(result) {
-        try {
-            if (!result || result.gesture === "none") return;
-            if (!this.camera || !this.controls) {
-                console.warn("CSV3DViewer applyGesture: camera or controls not ready");
-                return;
-            }
+  applyGesture(result) {
+    try {
+      if (!result || result.gesture === "none") return;
+      if (!this.camera || !this.controls) {
+        console.warn("CSV3DViewer applyGesture: camera or controls not ready");
+        return;
+      }
 
-            if (result.gesture === "palm") {
-                // Use OrbitControls azimuth angle to rotate — no camera position fighting
-                const sensitivity = 0.005;
-                const angle = result.deltaX * sensitivity;
-                const current = this.controls.getAzimuthalAngle();
-                this.controls.minAzimuthAngle = current + angle;
-                this.controls.maxAzimuthAngle = current + angle;
-                this.controls.update();
-                // Remove the lock after applying so user can still drag manually
-                this.controls.minAzimuthAngle = -Infinity;
-                this.controls.maxAzimuthAngle = Infinity;
-                console.log("Gesture: rotate deltaX", Math.round(result.deltaX));
-            }
+      if (result.gesture === "palm") {
+        const sensitivity = 0.005;
 
-            else if (result.gesture === "fingers_together") {
-                // Zoom in — move camera closer to origin
-                const zoomSpeed = 0.15;
-                const direction = this.camera.position.clone().normalize();
-                const currentDist = this.camera.position.length();
-                if (currentDist > this.controls.minDistance) {
-                    this.camera.position.addScaledVector(direction, -zoomSpeed);
-                    this.controls.target.set(0, 0, 0);
-                    this.controls.update();
-                    console.log("Gesture: zoom in, dist", currentDist.toFixed(2));
-                }
-            }
-
-            else if (result.gesture === "fist") {
-                // Zoom out — move camera further from origin
-                const zoomSpeed = 0.15;
-                const direction = this.camera.position.clone().normalize();
-                const currentDist = this.camera.position.length();
-                if (currentDist < this.controls.maxDistance) {
-                    this.camera.position.addScaledVector(direction, zoomSpeed);
-                    this.controls.target.set(0, 0, 0);
-                    this.controls.update();
-                    console.log("Gesture: zoom out, dist", currentDist.toFixed(2));
-                }
-            }
-
-        } catch (err) {
-            console.error("CSV3DViewer applyGesture() error:", err.message);
+        // Horizontal rotation — azimuth angle (left/right)
+        if (result.deltaX !== 0) {
+          const azimuthAngle = result.deltaX * sensitivity;
+          const currentAzimuth = this.controls.getAzimuthalAngle();
+          this.controls.minAzimuthAngle = currentAzimuth + azimuthAngle;
+          this.controls.maxAzimuthAngle = currentAzimuth + azimuthAngle;
+          this.controls.update();
+          this.controls.minAzimuthAngle = -Infinity;
+          this.controls.maxAzimuthAngle = Infinity;
+          console.log("Gesture: rotate H, deltaX", Math.round(result.deltaX));
         }
+
+        // Vertical rotation — polar angle (up/down)
+        // deltaY is inverted: moving hand up = negative Y in pixel space = look up
+        if (result.deltaY !== 0) {
+          const polarAngle = result.deltaY * sensitivity;
+          const currentPolar = this.controls.getPolarAngle();
+          const newPolar = Math.max(
+            this.controls.minPolarAngle,
+            Math.min(this.controls.maxPolarAngle, currentPolar + polarAngle)
+          );
+          this.controls.minPolarAngle = newPolar;
+          this.controls.maxPolarAngle = newPolar;
+          this.controls.update();
+          this.controls.minPolarAngle = 0.2;
+          this.controls.maxPolarAngle = Math.PI - 0.2;
+          console.log("Gesture: rotate V, deltaY", Math.round(result.deltaY));
+        }
+
+      } else if (result.gesture === "fingers_together") {
+        const zoomSpeed = 0.15;
+        const direction = this.camera.position.clone().normalize();
+        const currentDist = this.camera.position.length();
+        if (currentDist > this.controls.minDistance) {
+          this.camera.position.addScaledVector(direction, -zoomSpeed);
+          this.controls.target.set(0, 0, 0);
+          this.controls.update();
+          console.log("Gesture: zoom in, dist", currentDist.toFixed(2));
+        }
+
+      } else if (result.gesture === "fist") {
+        const zoomSpeed = 0.15;
+        const direction = this.camera.position.clone().normalize();
+        const currentDist = this.camera.position.length();
+        if (currentDist < this.controls.maxDistance) {
+          this.camera.position.addScaledVector(direction, zoomSpeed);
+          this.controls.target.set(0, 0, 0);
+          this.controls.update();
+          console.log("Gesture: zoom out, dist", currentDist.toFixed(2));
+        }
+      }
+
+    } catch (err) {
+      console.error("CSV3DViewer applyGesture() error:", err.message);
     }
-
-
+  }
 
   updateLegend(xCol, yCol, zCol) {
     const legend = document.getElementById("legend");
@@ -233,15 +217,9 @@ class CSV3DViewer {
     const zMap = this.dataMapper.getCategoryMapping(zCol);
 
     let html = "";
-    html += `<div class="legend-item"><strong>X Axis:</strong> ${xCol} ${
-      xMap ? "(Categorical)" : "(Numeric)"
-    }</div>`;
-    html += `<div class="legend-item"><strong>Y Axis:</strong> ${yCol} ${
-      yMap ? "(Categorical)" : "(Numeric)"
-    }</div>`;
-    html += `<div class="legend-item"><strong>Z Axis:</strong> ${zCol} ${
-      zMap ? "(Categorical)" : "(Numeric)"
-    }</div>`;
+    html += `<div class="legend-item"><strong>X Axis:</strong> ${xCol} ${xMap ? "(Categorical)" : "(Numeric)"}</div>`;
+    html += `<div class="legend-item"><strong>Y Axis:</strong> ${yCol} ${yMap ? "(Categorical)" : "(Numeric)"}</div>`;
+    html += `<div class="legend-item"><strong>Z Axis:</strong> ${zCol} ${zMap ? "(Categorical)" : "(Numeric)"}</div>`;
     html += `<div class="legend-item"><strong>Points:</strong> ${this.objects.length}</div>`;
 
     content.innerHTML = html;

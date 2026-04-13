@@ -1,7 +1,9 @@
 class GestureRecognizer {
   constructor() {
     this.lastX = null;
+    this.lastY = null;
     this.lastDeltaX = 0;
+    this.lastDeltaY = 0;
     this.momentumFrames = 0;
     this.handCentred = false;
     this._centreZone = 80;
@@ -10,6 +12,11 @@ class GestureRecognizer {
     this.stillFrames = 0;
     this._stillThreshold = 6;
     this._motionCutoff = 6;
+
+    // Separate smoothing histories for X and Y
+    this._deltaXHistory = [];
+    this._deltaYHistory = [];
+    this._smoothWindow = 5;
   }
 
   dist(a, b) {
@@ -21,18 +28,28 @@ class GestureRecognizer {
     }
   }
 
+  _smooth(history, raw) {
+    history.push(raw);
+    if (history.length > this._smoothWindow) history.shift();
+    return history.reduce((a, b) => a + b, 0) / history.length;
+  }
+
   classify(keypoints) {
     try {
-      // No hand detected — reset flags, apply momentum then stop
+      // No hand — reset all flags and drain momentum
       if (!keypoints || keypoints.length < 21) {
         this.handCentred = false;
         this.stillFrames = 0;
+        this._deltaXHistory = [];
+        this._deltaYHistory = [];
+        this.lastX = null;
+        this.lastY = null;
         if (this.momentumFrames > 0) {
           this.momentumFrames--;
           this.lastDeltaX *= 0.8;
-          return { gesture: "palm", deltaX: this.lastDeltaX };
+          this.lastDeltaY *= 0.8;
+          return { gesture: "palm", deltaX: this.lastDeltaX, deltaY: this.lastDeltaY };
         }
-        this.lastX = null;
         return { gesture: "none" };
       }
 
@@ -42,12 +59,18 @@ class GestureRecognizer {
       const xs = tips.map(t => t.x);
       const spread = Math.max(...xs) - Math.min(...xs);
 
-      // Always track deltaX so the stillness counter works regardless of gesture
       const palmX = keypoints[9].x;
-      const deltaX = this.lastX !== null ? palmX - this.lastX : 0;
+      const palmY = keypoints[9].y;
 
-      // Update stillness counter
-      if (Math.abs(deltaX) < this._motionCutoff) {
+      // Smooth both axes independently
+      const rawDeltaX = this.lastX !== null ? palmX - this.lastX : 0;
+      const rawDeltaY = this.lastY !== null ? palmY - this.lastY : 0;
+      const smoothDeltaX = this._smooth(this._deltaXHistory, rawDeltaX);
+      const smoothDeltaY = this._smooth(this._deltaYHistory, rawDeltaY);
+
+      // Stillness — uses the larger of the two axes
+      const maxDelta = Math.max(Math.abs(smoothDeltaX), Math.abs(smoothDeltaY));
+      if (maxDelta < this._motionCutoff) {
         this.stillFrames = Math.min(this.stillFrames + 1, this._stillThreshold + 5);
       } else {
         this.stillFrames = 0;
@@ -55,49 +78,66 @@ class GestureRecognizer {
 
       const isStill = this.stillFrames >= this._stillThreshold;
 
-      // Closed fist: zoom out — only when hand is still
+      // Closed fist: zoom out — still only
       if (avgDist < 80) {
         this.lastX = null;
+        this.lastY = null;
         this.lastDeltaX = 0;
+        this.lastDeltaY = 0;
         this.momentumFrames = 0;
         return isStill ? { gesture: "fist" } : { gesture: "none" };
       }
 
-      // Fingers together: zoom in — only when hand is still
+      // Fingers together: zoom in — still only
       if (spread < 55 && avgDist < 130) {
         this.lastX = null;
+        this.lastY = null;
         this.lastDeltaX = 0;
+        this.lastDeltaY = 0;
         this.momentumFrames = 0;
         return isStill ? { gesture: "fingers_together" } : { gesture: "none" };
       }
 
-      // Open palm: rotation — dominant, always takes priority
+      // Open palm: rotation — dominant axis lock
       if (avgDist > 150) {
-        // Check if hand passes through centre zone to unlock rotation
+        // Centre-lock: must pass through centre before horizontal rotation unlocks
         if (Math.abs(palmX - this._frameCentre) < this._centreZone) {
           this.handCentred = true;
         }
 
         this.lastX = palmX;
+        this.lastY = palmY;
 
-        // Must be centred before rotation is allowed
         if (!this.handCentred) {
           return { gesture: "none" };
         }
 
-        this.lastDeltaX = deltaX;
+        // Dominant axis lock — zero out the weaker axis completely
+        let outDeltaX = 0;
+        let outDeltaY = 0;
+
+        if (Math.abs(smoothDeltaX) >= Math.abs(smoothDeltaY)) {
+          outDeltaX = smoothDeltaX;   // horizontal wins
+        } else {
+          outDeltaY = smoothDeltaY;   // vertical wins
+        }
+
+        this.lastDeltaX = outDeltaX;
+        this.lastDeltaY = outDeltaY;
         this.momentumFrames = 8;
-        return { gesture: "palm", deltaX: deltaX };
+        return { gesture: "palm", deltaX: outDeltaX, deltaY: outDeltaY };
       }
 
       // Transition zone — keep momentum going
       if (this.momentumFrames > 0) {
         this.momentumFrames--;
         this.lastDeltaX *= 0.8;
-        return { gesture: "palm", deltaX: this.lastDeltaX };
+        this.lastDeltaY *= 0.8;
+        return { gesture: "palm", deltaX: this.lastDeltaX, deltaY: this.lastDeltaY };
       }
 
       this.lastX = null;
+      this.lastY = null;
       return { gesture: "none" };
 
     } catch (err) {
