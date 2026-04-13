@@ -5,9 +5,16 @@ class GestureRecognizer {
     this.lastDeltaX = 0;
     this.lastDeltaY = 0;
     this.momentumFrames = 0;
+
+    // Horizontal centre-lock
     this.handCentred = false;
     this._centreZone = 80;
-    this._frameCentre = 320;
+    this._frameCentreX = 320;
+
+    // Vertical centre-lock (same concept, frame is 640px tall)
+    this.handCentredY = false;
+    this._centreZoneY = 80;
+    this._frameCentreY = 320;
 
     this.stillFrames = 0;
     this._stillThreshold = 6;
@@ -39,6 +46,7 @@ class GestureRecognizer {
       // No hand — reset all flags and drain momentum
       if (!keypoints || keypoints.length < 21) {
         this.handCentred = false;
+        this.handCentredY = false;        // reset vertical lock too
         this.stillFrames = 0;
         this._deltaXHistory = [];
         this._deltaYHistory = [];
@@ -68,7 +76,7 @@ class GestureRecognizer {
       const smoothDeltaX = this._smooth(this._deltaXHistory, rawDeltaX);
       const smoothDeltaY = this._smooth(this._deltaYHistory, rawDeltaY);
 
-      // Stillness — uses the larger of the two axes
+      // Stillness uses the larger of the two axes
       const maxDelta = Math.max(Math.abs(smoothDeltaX), Math.abs(smoothDeltaY));
       if (maxDelta < this._motionCutoff) {
         this.stillFrames = Math.min(this.stillFrames + 1, this._stillThreshold + 5);
@@ -100,26 +108,29 @@ class GestureRecognizer {
 
       // Open palm: rotation — dominant axis lock
       if (avgDist > 150) {
-        // Centre-lock: must pass through centre before horizontal rotation unlocks
-        if (Math.abs(palmX - this._frameCentre) < this._centreZone) {
+        // Horizontal centre-lock
+        if (Math.abs(palmX - this._frameCentreX) < this._centreZone) {
           this.handCentred = true;
+        }
+
+        // Vertical centre-lock — same logic, must pass through vertical middle
+        if (Math.abs(palmY - this._frameCentreY) < this._centreZoneY) {
+          this.handCentredY = true;
         }
 
         this.lastX = palmX;
         this.lastY = palmY;
 
-        if (!this.handCentred) {
-          return { gesture: "none" };
-        }
-
-        // Dominant axis lock — zero out the weaker axis completely
+        // Dominant axis lock — zero out the weaker axis
         let outDeltaX = 0;
         let outDeltaY = 0;
 
         if (Math.abs(smoothDeltaX) >= Math.abs(smoothDeltaY)) {
-          outDeltaX = smoothDeltaX;   // horizontal wins
+          // Horizontal wins — only allow if centred horizontally
+          outDeltaX = this.handCentred ? smoothDeltaX : 0;
         } else {
-          outDeltaY = smoothDeltaY;   // vertical wins
+          // Vertical wins — only allow if centred vertically
+          outDeltaY = this.handCentredY ? smoothDeltaY : 0;
         }
 
         this.lastDeltaX = outDeltaX;
