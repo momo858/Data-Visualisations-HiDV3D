@@ -129,8 +129,8 @@ class GestureRecognizer {
           // Horizontal wins — only allow if centred horizontally
           outDeltaX = this.handCentred ? smoothDeltaX : 0;
         } else {
-          // Vertical wins — only allow if centred vertically
-          outDeltaY = this.handCentredY ? smoothDeltaY : 0;
+          // Vertical wins — inverted so hand up = camera up
+          outDeltaY = this.handCentredY ? -smoothDeltaY : 0;
         }
 
         this.lastDeltaX = outDeltaX;
