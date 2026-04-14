@@ -6,11 +6,11 @@ document.addEventListener("DOMContentLoaded", function () {
   let parsedCsvData = null;
   let columnDetector = null;
   const viewer = new CSV3DViewer("view3d");
-  window.viewer = viewer; 
+  window.viewer = viewer;
   window.handTracker = new HandTracker();
   window.gestureRecognizer = new GestureRecognizer();
   let gesturePanelActive = false;
-  
+
   const uploadBtn = document.getElementById("uploadBtn");
   const csvInput = document.getElementById("csvInput");
   const visualizeBtn = document.getElementById("visualizeBtn");
@@ -48,8 +48,7 @@ document.addEventListener("DOMContentLoaded", function () {
         document.getElementById("rowCount").textContent = parsedCsvData.length;
         document.getElementById("colCount").textContent = columns.length;
         document.getElementById("numericCount").textContent = numericCount;
-        document.getElementById("categoricalCount").textContent =
-          categoricalCount;
+        document.getElementById("categoricalCount").textContent = categoricalCount;
         dataInfo.style.display = "block";
 
         // Populate column selectors
@@ -66,6 +65,24 @@ document.addEventListener("DOMContentLoaded", function () {
         resetBtn.disabled = false;
 
         console.log("CSV loaded:", parsedCsvData.length, "rows");
+
+        // Save dataset metadata to the database
+        fetch('http://localhost:3000/api/datasets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: file.name.replace('.csv', ''),
+            filename: file.name,
+            row_count: parsedCsvData.length,
+            columns: columns.map(c => c.name)
+          })
+        })
+        .then(res => res.json())
+        .then(saved => {
+          console.log('Dataset saved to DB:', saved);
+          window._currentDatasetId = saved.id;  // store ID for saving visualisations later
+        })
+        .catch(err => console.error('Failed to save dataset:', err));
       },
       error: function (err) {
         console.error("CSV parsing error:", err);
@@ -103,38 +120,46 @@ document.addEventListener("DOMContentLoaded", function () {
     const zCol = document.getElementById("zAxis").value;
 
     viewer.visualizeData(parsedCsvData, xCol, yCol, zCol);
+
+    // Save axis mapping to the database
+    if (window._currentDatasetId) {
+      fetch('http://localhost:3000/api/visualisations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dataset_id: window._currentDatasetId,
+          x_col: xCol,
+          y_col: yCol,
+          z_col: zCol,
+          camera_pos: { x: 15, y: 15, z: 15 }
+        })
+      })
+      .then(res => res.json())
+      .then(saved => console.log('Visualisation saved to DB:', saved))
+      .catch(err => console.error('Failed to save visualisation:', err));
+    }
   });
 
-const handControlBtn = document.getElementById('handControlBtn');
+  const handControlBtn = document.getElementById('handControlBtn');
 
-  handControlBtn.addEventListener('click', async function() {
-      const panel = document.getElementById('handGesturePanel');
-      const video = document.getElementById('webcam'); // ID matches your index.html
-      
-      gesturePanelActive = !gesturePanelActive;
-      
-      if (gesturePanelActive) {
-          // TURN ON hand tracking
-          this.textContent = "Stop Hand Control";
-          panel.style.display = "block";
-          
-          // Use the exact model path we found
-          const modelPath = './nano_handpose_model/model.json';
-          
-          // Pass the path and the ID of the video element
-          await window.handTracker.init(modelPath, 'webcam');
-          
-      } else {
-          // TURN OFF hand tracking
-          this.textContent = "Hand Control";
-          panel.style.display = "none";
-          
-          // Call the stop method we wrote in HandTrack.js
-          window.handTracker.stop();
-          
-          // Clear status text
-          document.getElementById('gestureStatus').textContent = "";
-      }
+  handControlBtn.addEventListener('click', async function () {
+    const panel = document.getElementById('handGesturePanel');
+    const video = document.getElementById('webcam');
+
+    gesturePanelActive = !gesturePanelActive;
+
+    if (gesturePanelActive) {
+      this.textContent = "Stop Hand Control";
+      panel.style.display = "block";
+
+      const modelPath = './nano_handpose_model/model.json';
+      await window.handTracker.init(modelPath, 'webcam');
+    } else {
+      this.textContent = "Hand Control";
+      panel.style.display = "none";
+      window.handTracker.stop();
+      document.getElementById('gestureStatus').textContent = "";
+    }
   });
 
   console.log("HIDV3D Universal CSV Visualizer initialized!");
