@@ -7,99 +7,119 @@
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <header>
-        <h1>HIDV3D</h1>
-        <p class="subtitle">Web-based 3D Data Visualization</p>
-    </header>
 
-    <main>
-        <div class="controls">
-            <div class="button-group">
-                <button id="uploadBtn"> Upload CSV</button>
-                <button id="visualizeBtn" disabled> Visualize Data</button>
-                <button id="resetBtn" disabled> Reset View</button>
-                <button id="handControlBtn"> Hand Control</button>
-            </div>
-
-            <div id="handGesturePanel" style="display:none; position:relative; width:320px; height:240px; margin-top:1rem;">
-
-            <div id="handLoading" style="display:none; position:absolute; top:5px; left:5px; z-index:10; background:#fffcee; color:#007bff; padding:5px 10px; border-radius:6px;">
-                Loading handpose model…
-            </div>
-
-            <!-- Webcam video stream  -->
-            <video id="webcam" autoplay playsinline width="320" height="240" style="position:absolute; left:0; top:0; background:#222; border-radius:10px; border:1px solid #007bff; z-index:1;"></video>
-            
-            <!-- Canvas to draw hand landmarks over the webcam -->
-            <canvas id="gestureCanvas" width="320" height="240" style="position:absolute; left:0; top:0; pointer-events:none; z-index:2;"></canvas>
-           
-            <!-- Gesture status -->
-            <div id="gestureStatus" style="position:absolute; bottom:12px; right:25px; font-size:2.5rem; z-index:3;"></div>
-            </div>
-
-
-            <input id="csvInput" type="file" accept=".csv" style="display:none;">
-
-            <div id="dataInfo" style="display:none;" class="info-panel">
-                <h4>Dataset Information</h4>
-                <div class="stats">
-                    <div><strong>Rows:</strong> <span id="rowCount">0</span></div>
-                    <div><strong>Columns:</strong> <span id="colCount">0</span></div>
-                    <div><strong>Numeric:</strong> <span id="numericCount">0</span></div>
-                    <div><strong>Categorical:</strong> <span id="categoricalCount">0</span></div>
-                </div>
-            </div>
-
-            <div id="columnSelector">
-                <h3>Select Columns for 3D Axes</h3>
-                <div class="column-grid">
-                    <div class="column-option">
-                        <label for="xAxis">X Axis:</label>
-                        <select id="xAxis"></select>
-                    </div>
-                    <div class="column-option">
-                        <label for="yAxis">Y Axis:</label>
-                        <select id="yAxis"></select>
-                    </div>
-                    <div class="column-option">
-                        <label for="zAxis">Z Axis:</label>
-                        <select id="zAxis"></select>
-                    </div>
-                </div>
-            </div>
+    <!-- TOP NAV -->
+    <nav class="topnav">
+        <div class="topnav-brand">
+            <span class="topnav-logo">HIDV3D</span>
+            <span class="topnav-sub">3D Data Visualisation</span>
         </div>
+        <div class="topnav-actions">
+            <button id="loginBtn" class="btn-ghost">Login / Register</button>
+        </div>
+    </nav>
+
+    <!-- 3D VIEWPORT — full height, webcam overlaid bottom-left -->
+    <section class="viewport-section">
 
         <div id="view3d"></div>
 
+        <div id="handGesturePanel"
+             style="display:none; position:absolute; width:240px; height:180px;
+                    left:16px; bottom:16px; z-index:10;">
+
+            <div id="handLoading"
+                 style="display:none; position:absolute; top:5px; left:5px; z-index:10;
+                        background:#fffcee; color:#007bff; padding:5px 10px; border-radius:6px;">
+                Loading handpose model…
+            </div>
+
+            <video id="webcam" autoplay playsinline width="240" height="180"
+                   style="position:absolute; left:0; top:0; background:#222;
+                          border-radius:10px; border:1px solid #007bff; z-index:1;"></video>
+
+            <canvas id="gestureCanvas" width="240" height="180"
+                    style="position:absolute; left:0; top:0;
+                           pointer-events:none; z-index:2;"></canvas>
+
+            <div id="gestureStatus"
+                 style="position:absolute; bottom:8px; right:10px;
+                        font-size:1.8rem; z-index:3;"></div>
+        </div>
+
+    </section>
+
+    <!-- CONTROLS PANEL — scroll down to reach -->
+    <main class="controls-section">
+
+        <input id="csvInput" type="file" accept=".csv" style="display:none;">
+
+        <!-- Action buttons -->
+        <div class="controls-card">
+            <h2 class="controls-title">Controls</h2>
+            <div class="button-group">
+                <button id="uploadBtn">Upload CSV</button>
+                <button id="visualizeBtn" disabled>Visualize Data</button>
+                <button id="resetBtn" disabled>Reset View</button>
+                <button id="handControlBtn">Hand Control</button>
+            </div>
+        </div>
+
+        <!-- Dataset info -->
+        <div id="dataInfo" style="display:none;" class="info-panel">
+            <h4>Dataset Information</h4>
+            <div class="stats">
+                <div><strong>Rows:</strong> <span id="rowCount">0</span></div>
+                <div><strong>Columns:</strong> <span id="colCount">0</span></div>
+                <div><strong>Numeric:</strong> <span id="numericCount">0</span></div>
+                <div><strong>Categorical:</strong> <span id="categoricalCount">0</span></div>
+            </div>
+        </div>
+
+        <!-- Axis selector -->
+        <div id="columnSelector">
+            <h3>Select Columns for 3D Axes</h3>
+            <div class="column-grid">
+                <div class="column-option">
+                    <label for="xAxis">X Axis:</label>
+                    <select id="xAxis"></select>
+                </div>
+                <div class="column-option">
+                    <label for="yAxis">Y Axis:</label>
+                    <select id="yAxis"></select>
+                </div>
+                <div class="column-option">
+                    <label for="zAxis">Z Axis:</label>
+                    <select id="zAxis"></select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
         <div id="legend" style="display:none;" class="legend">
-            <h3>Visualization Legend</h3>
+            <h3>Visualisation Legend</h3>
             <div id="legendContent"></div>
         </div>
+
     </main>
 
-
-
-    <!-- Tensorflow.js and Handpose/fingerpose: -->
+    <!-- TensorFlow.js -->
     <script src="https://unpkg.com/@tensorflow/tfjs-core@3.7.0/dist/tf-core.js"></script>
     <script src="https://unpkg.com/@tensorflow/tfjs-converter@3.7.0/dist/tf-converter.js"></script>
     <script src="https://unpkg.com/@tensorflow/tfjs-backend-webgl@3.7.0/dist/tf-backend-webgl.js"></script>
-
 
     <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
 
-
-    <!-- JavaScript Files - -->
+    <!-- Application Scripts -->
     <script src="scripts/DataMapper.js"></script>
     <script src="scripts/CSV3DViewer.js"></script>
     <script src="scripts/ColumnDetector.js"></script>
-    
     <script src="scripts/HandTrack.js"></script>
     <script src="scripts/GestureRecognizer.js"></script>
     <script src="scripts/app.js"></script>
-
 
 </body>
 </html>

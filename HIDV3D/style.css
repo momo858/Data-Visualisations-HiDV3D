@@ -1,17 +1,20 @@
 :root {
-    --color-primary: #007bff;
+    --color-primary:       #007bff;
     --color-primary-hover: #0056b3;
-    --color-secondary: #6c757d;
-    --color-success: #28a745;
-    --color-danger: #dc3545;
-    --color-bg: #f5f5f5;
-    --color-surface: #ffffff;
-    --color-border: #bbb;
-    --color-text: #333;
-    --color-text-light: #666;
+    --color-secondary:     #6c757d;
+    --color-success:       #28a745;
+    --color-danger:        #dc3545;
+    --color-bg:            #f5f5f5;
+    --color-surface:       #ffffff;
+    --color-border:        #ddd;
+    --color-text:          #333;
+    --color-text-light:    #666;
+
+    --nav-height: 56px;
 }
 
-* {
+/* ─── Reset ─────────────────────────────────────────── */
+*, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -24,53 +27,142 @@ body {
     color: var(--color-text);
 }
 
-header {
+/* ─── Top Nav ────────────────────────────────────────── */
+.topnav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--nav-height);
+    padding: 0 1.5rem;
     background: var(--color-surface);
-    padding: 1.5rem 2rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 2rem;
+    border-bottom: 1px solid rgba(0, 123, 255, 0.12);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-header h1 {
-    font-size: 2.5em;
-    margin-bottom: 0.25rem;
+.topnav-brand {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
 }
 
-.subtitle {
+.topnav-logo {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    letter-spacing: -0.01em;
+}
+
+.topnav-sub {
+    font-size: 0.8rem;
     color: var(--color-text-light);
-    font-size: 1.1em;
 }
 
-main {
+.topnav-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Ghost button for Login in topnav */
+.btn-ghost {
+    padding: 6px 16px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 1.5px solid var(--color-primary);
+    border-radius: 5px;
+    background: transparent;
+    color: var(--color-primary);
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.btn-ghost:hover {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+/* ─── 3D Viewport Section ────────────────────────────── */
+.viewport-section {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - var(--nav-height));
+    background: #1a1a1a;
+    overflow: hidden;
+}
+
+#view3d {
+    width: 100%;
+    height: 100%;
+    background: #222;
+    display: block;
+}
+
+/* ─── Webcam Overlay (bottom-left of viewport) ───────── */
+#handGesturePanel {
+    border: 2px solid rgba(0, 123, 255, 0.7);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 20px rgba(0, 123, 255, 0.25);
+    overflow: hidden;
+}
+
+#webcam,
+#gestureCanvas {
+    transform: scaleX(-1);
+}
+
+#handLoading {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* ─── Controls Section (below the viewport) ──────────── */
+.controls-section {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0 2rem;
+    padding: 2rem 2rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
 }
 
-.controls {
+/* Controls card */
+.controls-card {
     background: var(--color-surface);
     padding: 1.5rem;
     border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    margin-bottom: 2rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
+.controls-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 1rem;
+}
+
+/* Button group */
 .button-group {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-    margin-bottom: 1rem;
 }
 
 button {
     padding: 10px 20px;
-    font-size: 1rem;
+    font-size: 0.95rem;
     border: none;
     border-radius: 5px;
     background: var(--color-primary);
     color: white;
     cursor: pointer;
-    transition: background 0.3s;
+    transition: background 0.2s;
     font-weight: 500;
 }
 
@@ -81,23 +173,41 @@ button:hover:not(:disabled) {
 button:disabled {
     background: var(--color-secondary);
     cursor: not-allowed;
-    opacity: 0.6;
+    opacity: 0.55;
 }
 
-button.success {
-    background: var(--color-success);
-}
+button.success { background: var(--color-success); }
+button.danger  { background: var(--color-danger); }
 
-button.danger {
-    background: var(--color-danger);
-}
-
-#columnSelector {
-    background: var(--color-surface);
+/* Info panel */
+.info-panel {
+    background: rgba(0, 123, 255, 0.06);
+    border: 1px solid rgba(0, 123, 255, 0.18);
     padding: 1rem;
     border-radius: 8px;
+}
+
+.info-panel h4 {
+    margin-bottom: 0.5rem;
+    color: var(--color-primary);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* Column selector */
+#columnSelector {
+    background: var(--color-surface);
+    padding: 1.25rem;
+    border-radius: 8px;
     border: 1px solid var(--color-border);
-    margin-top: 1rem;
     display: none;
 }
 
@@ -105,74 +215,54 @@ button.danger {
     display: block;
 }
 
+#columnSelector h3 {
+    font-size: 0.95rem;
+    margin-bottom: 0.75rem;
+    color: var(--color-text);
+}
+
 .column-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 1rem;
-    margin-top: 1rem;
 }
 
 .column-option {
     display: flex;
     flex-direction: column;
     padding: 0.75rem;
-    border: 2px solid var(--color-border);
-    border-radius: 5px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
     background: white;
 }
 
 .column-option label {
-    font-weight: 500;
-    margin-bottom: 0.25rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+    margin-bottom: 0.35rem;
+    color: var(--color-text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 .column-option select {
-    padding: 0.5rem;
+    padding: 0.45rem 0.5rem;
     border: 1px solid var(--color-border);
     border-radius: 4px;
     font-size: 0.9rem;
 }
 
-.info-panel {
-    background: #e7f3ff;
-    border-left: 4px solid var(--color-primary);
-    padding: 1rem;
-    margin: 1rem 0;
-    border-radius: 4px;
-}
-
-.info-panel h4 {
-    margin-bottom: 0.5rem;
-    color: var(--color-primary);
-}
-
-.stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 0.5rem;
-    font-size: 0.9rem;
-}
-
-#view3d {
-    width: 100%;
-    height: 600px;
-    background: #222;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
-
+/* Legend */
 .legend {
     background: var(--color-surface);
     padding: 1rem;
     border-radius: 8px;
-    margin-top: 1rem;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
 }
 
 .legend h3 {
     margin-bottom: 0.75rem;
+    font-size: 0.95rem;
 }
 
 .legend-item {
@@ -186,63 +276,28 @@ button.danger {
     border-bottom: none;
 }
 
-#handControlPanel {
-  border: 2px solid #007bff;
-  border-radius: 8px;
-  padding: 15px;
-  background-color: #f8f9fa;
-}
-
-#handControlPanel video {
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-}
-
-#handStatus {
-  color: #007bff;
-  font-size: 16px;
-}
-
-#handControlBtn {
-  background-color: #007bff;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-#handControlBtn:hover {
-  background-color: #0056b3;
-}
-
-
-#handGesturePanel {
-  border: 2px solid #007bff;
-  border-radius: 10px;
-  background: #f6fafe;
-  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.09);
-  margin-bottom: 18px;
-}
-
-#webcam, #gestureCanvas { transform: scaleX(-1); }
-
+/* ─── Responsive ─────────────────────────────────────── */
 @media (max-width: 768px) {
-    header {
-        padding: 1rem;
+    .topnav-sub {
+        display: none;
     }
 
-    header h1 {
-        font-size: 1.75em;
+    .viewport-section {
+        height: calc(100svh - var(--nav-height));
     }
 
-    main {
-        padding: 0 1rem;
+    #handGesturePanel {
+        width: 160px !important;
+        height: 120px !important;
     }
 
-    #view3d {
-        height: 400px;
+    #webcam,
+    #gestureCanvas {
+        width: 160px !important;
+        height: 120px !important;
+    }
+
+    .controls-section {
+        padding: 1.25rem 1rem 2rem;
     }
 }
-
-
