@@ -420,6 +420,17 @@ button.danger  { background: var(--color-danger); }
 }
 
 
+.btn-logout {
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+}
+
+.btn-logout:hover {
+    background: var(--color-danger);
+    color: #fff;
+}
+
+
 
 /* ─── Responsive ─────────────────────────────────────── */
 @media (max-width: 768px) {

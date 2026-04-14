@@ -12,6 +12,7 @@ const API = 'http://localhost:3000';
 const authModal     = document.getElementById('authModal');
 const loginBtn      = document.getElementById('loginBtn');
 const modalCloseBtn = document.getElementById('modalCloseBtn');
+const logoutBtn     = document.getElementById('logoutBtn');
 
 loginBtn.addEventListener('click', () => {
   authModal.style.display = 'flex';
@@ -89,12 +90,19 @@ document.getElementById('registerForm').addEventListener('submit', async e => {
   }
 });
 
-// ── Update nav button after login ─────────────────────
+// ── Update nav after login/logout ─────────────────────
 function updateAuthUI() {
-  loginBtn.textContent     = authUser ? `👤 ${authUser}` : 'Login / Register';
-  const saveVisBtn         = document.getElementById('saveVisBtn');
+  loginBtn.textContent    = authUser ? `👤 ${authUser}` : 'Login / Register';
+  loginBtn.style.display  = authUser ? 'none' : '';
+  logoutBtn.style.display = authUser ? '' : 'none';
+  const saveVisBtn = document.getElementById('saveVisBtn');
   if (saveVisBtn) saveVisBtn.disabled = !authToken;
   if (authToken) loadSavedVisualisations();
+}
+
+// ── Stub — real function assigned inside DOMContentLoaded ──
+function loadSavedVisualisations() {
+  if (window._loadSavedVisualisations) window._loadSavedVisualisations();
 }
 
 // ============================================
@@ -102,11 +110,11 @@ function updateAuthUI() {
 // ============================================
 
 document.addEventListener("DOMContentLoaded", function () {
-  let parsedCsvData   = null;
-  let columnDetector  = null;
-  const viewer        = new CSV3DViewer("view3d");
-  window.viewer       = viewer;
-  window.handTracker  = new HandTracker();
+  let parsedCsvData        = null;
+  let columnDetector       = null;
+  const viewer             = new CSV3DViewer("view3d");
+  window.viewer            = viewer;
+  window.handTracker       = new HandTracker();
   window.gestureRecognizer = new GestureRecognizer();
   let gesturePanelActive   = false;
 
@@ -119,6 +127,71 @@ document.addEventListener("DOMContentLoaded", function () {
   const saveVisBtn     = document.getElementById("saveVisBtn");
 
   uploadBtn.addEventListener("click", () => csvInput.click());
+
+  // ── Real loadSavedVisualisations (DOM is ready here) ─
+  window._loadSavedVisualisations = async function () {
+    if (!authToken) return;
+    try {
+      const res  = await fetch(`${API}/api/visualisations`, {
+        headers: { 'x-auth-token': authToken }
+      });
+      const list = await res.json();
+      const select = document.getElementById('savedVisList');
+      select.innerHTML = '<option value="">📂 My Visualisations…</option>';
+      list.forEach(v => {
+        const opt       = document.createElement('option');
+        opt.value       = v.id;
+        opt.textContent = `${v.dataset_name} — ${v.x_col}/${v.y_col}/${v.z_col}`;
+        opt.dataset.vis = JSON.stringify(v);
+        select.appendChild(opt);
+      });
+      const wrap = document.getElementById('visLoadWrap');
+      if (wrap) wrap.style.display = list.length ? 'flex' : 'none';
+    } catch (err) {
+      console.error('Failed to load visualisations:', err);
+    }
+  };
+
+  // ── Logout ────────────────────────────────────────────
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      await fetch(`${API}/api/auth/logout`, {
+        method: 'POST',
+        headers: { 'x-auth-token': authToken }
+      });
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+
+    authToken = null;
+    authUser  = null;
+
+    const visLoadWrap  = document.getElementById('visLoadWrap');
+    const savedVisList = document.getElementById('savedVisList');
+    if (saveVisBtn)   saveVisBtn.disabled = true;
+    if (visLoadWrap)  visLoadWrap.style.display = 'none';
+    if (savedVisList) savedVisList.innerHTML = '<option value="">📂 My Visualisations…</option>';
+
+    if (window.viewer) window.viewer.initScene();
+
+    parsedCsvData = null;
+    columnSelector.classList.remove('visible');
+    dataInfo.style.display = 'none';
+    visualizeBtn.disabled  = true;
+    resetBtn.disabled      = true;
+
+    if (window.handTracker) {
+      window.handTracker.stop();
+      const panel = document.getElementById('handGesturePanel');
+      if (panel) panel.style.display = 'none';
+      document.getElementById('gestureStatus').textContent = '';
+      document.getElementById('handControlBtn').textContent = 'Hand Control';
+      gesturePanelActive = false;
+    }
+
+    window._currentDatasetId = null;
+    updateAuthUI();
+  });
 
   // ── CSV Upload ────────────────────────────────────────
   csvInput.addEventListener("change", (event) => {
@@ -143,9 +216,9 @@ document.addEventListener("DOMContentLoaded", function () {
         const numericCount     = columns.filter(c => c.isNumeric).length;
         const categoricalCount = columns.length - numericCount;
 
-        document.getElementById("rowCount").textContent        = parsedCsvData.length;
-        document.getElementById("colCount").textContent        = columns.length;
-        document.getElementById("numericCount").textContent    = numericCount;
+        document.getElementById("rowCount").textContent         = parsedCsvData.length;
+        document.getElementById("colCount").textContent         = columns.length;
+        document.getElementById("numericCount").textContent     = numericCount;
         document.getElementById("categoricalCount").textContent = categoricalCount;
         dataInfo.style.display = "block";
 
@@ -162,7 +235,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         console.log("CSV loaded:", parsedCsvData.length, "rows");
 
-        // Save dataset metadata to DB
         fetch(`${API}/api/datasets`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -177,7 +249,6 @@ document.addEventListener("DOMContentLoaded", function () {
         .then(saved => {
           console.log('Dataset saved to DB:', saved);
           window._currentDatasetId = saved.id;
-          // Enable save button only if logged in
           if (authToken && saveVisBtn) saveVisBtn.disabled = false;
         })
         .catch(err => console.error('Failed to save dataset:', err));
@@ -191,11 +262,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ── Populate axis dropdowns ───────────────────────────
   function populateColumnSelectors(columns) {
-    const xAxis = document.getElementById("xAxis");
-    const yAxis = document.getElementById("yAxis");
-    const zAxis = document.getElementById("zAxis");
-
-    [xAxis, yAxis, zAxis].forEach(select => {
+    ['xAxis', 'yAxis', 'zAxis'].forEach(id => {
+      const select = document.getElementById(id);
       select.innerHTML = "";
       columns.forEach(col => {
         const option       = document.createElement("option");
@@ -217,7 +285,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const zCol = document.getElementById("zAxis").value;
 
     viewer.visualizeData(parsedCsvData, xCol, yCol, zCol);
-
   });
 
   // ── Reset View ────────────────────────────────────────
@@ -260,29 +327,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // ── Load Saved Visualisations List ───────────────────
-  async function loadSavedVisualisations() {
-    if (!authToken) return;
-    try {
-      const res  = await fetch(`${API}/api/visualisations`, {
-        headers: { 'x-auth-token': authToken }
-      });
-      const list = await res.json();
-      const select = document.getElementById('savedVisList');
-      select.innerHTML = '<option value="">📂 My Visualisations…</option>';
-      list.forEach(v => {
-        const opt        = document.createElement('option');
-        opt.value        = v.id;
-        opt.textContent  = `${v.dataset_name} — ${v.x_col}/${v.y_col}/${v.z_col}`;
-        opt.dataset.vis  = JSON.stringify(v);
-        select.appendChild(opt);
-      });
-      document.getElementById('visLoadWrap').style.display = list.length ? 'flex' : 'none';
-    } catch (err) {
-      console.error('Failed to load visualisations:', err);
-    }
-  }
-
   // ── Load Selected Visualisation ───────────────────────
   document.getElementById('loadVisBtn').addEventListener('click', () => {
     const select = document.getElementById('savedVisList');
@@ -290,17 +334,25 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!opt || !opt.dataset.vis) return;
     const v = JSON.parse(opt.dataset.vis);
 
+    // Restore axis selectors
     document.getElementById('xAxis').value = v.x_col;
     document.getElementById('yAxis').value = v.y_col;
     document.getElementById('zAxis').value = v.z_col;
 
+    // Restore camera
     if (v.camera_pos && viewer.camera) {
       const cp = typeof v.camera_pos === 'string' ? JSON.parse(v.camera_pos) : v.camera_pos;
       viewer.camera.position.set(cp.x, cp.y, cp.z);
       if (viewer.controls) viewer.controls.update();
     }
 
-    alert(`Loaded: ${v.dataset_name}`);
+    // Re-visualise immediately if CSV is loaded, otherwise prompt
+    if (parsedCsvData) {
+      viewer.initScene();
+      viewer.visualizeData(parsedCsvData, v.x_col, v.y_col, v.z_col);
+    } else {
+      alert(`Axes restored: ${v.x_col} / ${v.y_col} / ${v.z_col}\nUpload the CSV file then click Visualize.`);
+    }
   });
 
   // ── Delete Selected Visualisation ────────────────────
@@ -328,12 +380,12 @@ document.addEventListener("DOMContentLoaded", function () {
     gesturePanelActive = !gesturePanelActive;
 
     if (gesturePanelActive) {
-      this.textContent   = "Stop Hand Control";
+      this.textContent    = "Stop Hand Control";
       panel.style.display = "block";
-      const modelPath    = './nano_handpose_model/model.json';
+      const modelPath     = './nano_handpose_model/model.json';
       await window.handTracker.init(modelPath, 'webcam');
     } else {
-      this.textContent   = "Hand Control";
+      this.textContent    = "Hand Control";
       panel.style.display = "none";
       window.handTracker.stop();
       document.getElementById('gestureStatus').textContent = "";
