@@ -87,8 +87,10 @@ body {
 /* ─── 3D Viewport Section ────────────────────────────── */
 .viewport-section {
     position: relative;
-    width: 100%;
-    height: calc(100vh - var(--nav-height));
+    width: calc(100% - 4rem);
+    height: calc(100vh - var(--nav-height) - 2rem);
+    margin: 0.75rem auto 0;
+    border-radius: 12px;
     background: #1a1a1a;
     overflow: hidden;
 }
@@ -98,6 +100,7 @@ body {
     height: 100%;
     background: #222;
     display: block;
+    border-radius: 12px;
 }
 
 /* ─── Webcam Overlay (bottom-left of viewport) ───────── */
