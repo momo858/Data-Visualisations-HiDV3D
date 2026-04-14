@@ -2,7 +2,6 @@
 // APPLICATION CONTROLLER
 // ============================================
 
-
 // ── Auth state (in-memory, no localStorage) ──────────
 let authToken = null;
 let authUser  = null;
@@ -10,8 +9,8 @@ let authUser  = null;
 const API = 'http://localhost:3000';
 
 // ── Modal helpers ─────────────────────────────────────
-const authModal    = document.getElementById('authModal');
-const loginBtn     = document.getElementById('loginBtn');
+const authModal     = document.getElementById('authModal');
+const loginBtn      = document.getElementById('loginBtn');
 const modalCloseBtn = document.getElementById('modalCloseBtn');
 
 loginBtn.addEventListener('click', () => {
@@ -92,31 +91,36 @@ document.getElementById('registerForm').addEventListener('submit', async e => {
 
 // ── Update nav button after login ─────────────────────
 function updateAuthUI() {
-  loginBtn.textContent = authUser ? `👤 ${authUser}` : 'Login / Register';
+  loginBtn.textContent     = authUser ? `👤 ${authUser}` : 'Login / Register';
+  const saveVisBtn         = document.getElementById('saveVisBtn');
+  if (saveVisBtn) saveVisBtn.disabled = !authToken;
+  if (authToken) loadSavedVisualisations();
 }
 
-
-
-
+// ============================================
+// MAIN APP
+// ============================================
 
 document.addEventListener("DOMContentLoaded", function () {
-  let parsedCsvData = null;
-  let columnDetector = null;
-  const viewer = new CSV3DViewer("view3d");
-  window.viewer = viewer;
-  window.handTracker = new HandTracker();
+  let parsedCsvData   = null;
+  let columnDetector  = null;
+  const viewer        = new CSV3DViewer("view3d");
+  window.viewer       = viewer;
+  window.handTracker  = new HandTracker();
   window.gestureRecognizer = new GestureRecognizer();
-  let gesturePanelActive = false;
+  let gesturePanelActive   = false;
 
-  const uploadBtn = document.getElementById("uploadBtn");
-  const csvInput = document.getElementById("csvInput");
-  const visualizeBtn = document.getElementById("visualizeBtn");
-  const resetBtn = document.getElementById("resetBtn");
+  const uploadBtn      = document.getElementById("uploadBtn");
+  const csvInput       = document.getElementById("csvInput");
+  const visualizeBtn   = document.getElementById("visualizeBtn");
+  const resetBtn       = document.getElementById("resetBtn");
   const columnSelector = document.getElementById("columnSelector");
-  const dataInfo = document.getElementById("dataInfo");
+  const dataInfo       = document.getElementById("dataInfo");
+  const saveVisBtn     = document.getElementById("saveVisBtn");
 
   uploadBtn.addEventListener("click", () => csvInput.click());
 
+  // ── CSV Upload ────────────────────────────────────────
   csvInput.addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -126,9 +130,7 @@ document.addEventListener("DOMContentLoaded", function () {
       dynamicTyping: true,
       skipEmptyLines: true,
       complete: function (results) {
-        parsedCsvData = results.data.filter(
-          (row) => Object.keys(row).length > 0
-        );
+        parsedCsvData = results.data.filter(row => Object.keys(row).length > 0);
 
         if (parsedCsvData.length === 0) {
           alert("CSV file is empty or invalid!");
@@ -136,22 +138,19 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         columnDetector = new ColumnDetector(parsedCsvData, viewer.dataMapper);
-        const columns = columnDetector.getAllColumns();
+        const columns  = columnDetector.getAllColumns();
 
-        // Update UI
-        const numericCount = columns.filter((c) => c.isNumeric).length;
+        const numericCount     = columns.filter(c => c.isNumeric).length;
         const categoricalCount = columns.length - numericCount;
 
-        document.getElementById("rowCount").textContent = parsedCsvData.length;
-        document.getElementById("colCount").textContent = columns.length;
-        document.getElementById("numericCount").textContent = numericCount;
+        document.getElementById("rowCount").textContent        = parsedCsvData.length;
+        document.getElementById("colCount").textContent        = columns.length;
+        document.getElementById("numericCount").textContent    = numericCount;
         document.getElementById("categoricalCount").textContent = categoricalCount;
         dataInfo.style.display = "block";
 
-        // Populate column selectors
         populateColumnSelectors(columns);
 
-        // Auto-select best columns
         const bestCols = columnDetector.detectBestColumns();
         document.getElementById("xAxis").value = bestCols.x;
         document.getElementById("yAxis").value = bestCols.y;
@@ -159,56 +158,57 @@ document.addEventListener("DOMContentLoaded", function () {
 
         columnSelector.classList.add("visible");
         visualizeBtn.disabled = false;
-        resetBtn.disabled = false;
+        resetBtn.disabled     = false;
 
         console.log("CSV loaded:", parsedCsvData.length, "rows");
 
-        // Save dataset metadata to the database
-        fetch('http://localhost:3000/api/datasets', {
+        // Save dataset metadata to DB
+        fetch(`${API}/api/datasets`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: file.name.replace('.csv', ''),
-            filename: file.name,
+            name:      file.name.replace('.csv', ''),
+            filename:  file.name,
             row_count: parsedCsvData.length,
-            columns: columns.map(c => c.name)
+            columns:   columns.map(c => c.name)
           })
         })
         .then(res => res.json())
         .then(saved => {
           console.log('Dataset saved to DB:', saved);
-          window._currentDatasetId = saved.id;  // store ID for saving visualisations later
+          window._currentDatasetId = saved.id;
+          // Enable save button only if logged in
+          if (authToken && saveVisBtn) saveVisBtn.disabled = false;
         })
         .catch(err => console.error('Failed to save dataset:', err));
       },
       error: function (err) {
         console.error("CSV parsing error:", err);
         alert("Error parsing CSV file!");
-      },
+      }
     });
   });
 
+  // ── Populate axis dropdowns ───────────────────────────
   function populateColumnSelectors(columns) {
     const xAxis = document.getElementById("xAxis");
     const yAxis = document.getElementById("yAxis");
     const zAxis = document.getElementById("zAxis");
 
-    [xAxis, yAxis, zAxis].forEach((select) => {
+    [xAxis, yAxis, zAxis].forEach(select => {
       select.innerHTML = "";
-      columns.forEach((col) => {
-        const option = document.createElement("option");
-        option.value = col.name;
+      columns.forEach(col => {
+        const option       = document.createElement("option");
+        option.value       = col.name;
         option.textContent = `${col.name} ${col.isNumeric ? "(#)" : "(cat)"}`;
         select.appendChild(option);
       });
     });
   }
 
+  // ── Visualise ─────────────────────────────────────────
   visualizeBtn.addEventListener("click", () => {
-    if (!parsedCsvData) {
-      alert("Please upload a CSV file first!");
-      return;
-    }
+    if (!parsedCsvData) { alert("Please upload a CSV file first!"); return; }
 
     viewer.initScene();
 
@@ -218,41 +218,122 @@ document.addEventListener("DOMContentLoaded", function () {
 
     viewer.visualizeData(parsedCsvData, xCol, yCol, zCol);
 
-    // Save axis mapping to the database
-    if (window._currentDatasetId) {
-      fetch('http://localhost:3000/api/visualisations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dataset_id: window._currentDatasetId,
-          x_col: xCol,
-          y_col: yCol,
-          z_col: zCol,
-          camera_pos: { x: 15, y: 15, z: 15 }
-        })
-      })
-      .then(res => res.json())
-      .then(saved => console.log('Visualisation saved to DB:', saved))
-      .catch(err => console.error('Failed to save visualisation:', err));
+  });
+
+  // ── Reset View ────────────────────────────────────────
+  resetBtn.addEventListener("click", () => {
+    if (viewer.controls) {
+      viewer.camera.position.set(15, 15, 15);
+      viewer.controls.target.set(0, 0, 0);
+      viewer.controls.update();
     }
   });
 
+  // ── Save Visualisation ────────────────────────────────
+  saveVisBtn.addEventListener('click', async () => {
+    if (!authToken) { alert('Please log in to save.'); return; }
+    if (!window._currentDatasetId) { alert('Visualise a dataset first.'); return; }
+
+    const xCol = document.getElementById('xAxis').value;
+    const yCol = document.getElementById('yAxis').value;
+    const zCol = document.getElementById('zAxis').value;
+
+    const cam = viewer.camera
+      ? { x: viewer.camera.position.x, y: viewer.camera.position.y, z: viewer.camera.position.z }
+      : { x: 15, y: 15, z: 15 };
+
+    try {
+      const res = await fetch(`${API}/api/visualisations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-auth-token': authToken },
+        body: JSON.stringify({
+          dataset_id: window._currentDatasetId,
+          x_col: xCol, y_col: yCol, z_col: zCol,
+          camera_pos: cam
+        })
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      alert('Visualisation saved!');
+      loadSavedVisualisations();
+    } catch (err) {
+      alert('Save failed: ' + err.message);
+    }
+  });
+
+  // ── Load Saved Visualisations List ───────────────────
+  async function loadSavedVisualisations() {
+    if (!authToken) return;
+    try {
+      const res  = await fetch(`${API}/api/visualisations`, {
+        headers: { 'x-auth-token': authToken }
+      });
+      const list = await res.json();
+      const select = document.getElementById('savedVisList');
+      select.innerHTML = '<option value="">📂 My Visualisations…</option>';
+      list.forEach(v => {
+        const opt        = document.createElement('option');
+        opt.value        = v.id;
+        opt.textContent  = `${v.dataset_name} — ${v.x_col}/${v.y_col}/${v.z_col}`;
+        opt.dataset.vis  = JSON.stringify(v);
+        select.appendChild(opt);
+      });
+      document.getElementById('visLoadWrap').style.display = list.length ? 'flex' : 'none';
+    } catch (err) {
+      console.error('Failed to load visualisations:', err);
+    }
+  }
+
+  // ── Load Selected Visualisation ───────────────────────
+  document.getElementById('loadVisBtn').addEventListener('click', () => {
+    const select = document.getElementById('savedVisList');
+    const opt    = select.options[select.selectedIndex];
+    if (!opt || !opt.dataset.vis) return;
+    const v = JSON.parse(opt.dataset.vis);
+
+    document.getElementById('xAxis').value = v.x_col;
+    document.getElementById('yAxis').value = v.y_col;
+    document.getElementById('zAxis').value = v.z_col;
+
+    if (v.camera_pos && viewer.camera) {
+      const cp = typeof v.camera_pos === 'string' ? JSON.parse(v.camera_pos) : v.camera_pos;
+      viewer.camera.position.set(cp.x, cp.y, cp.z);
+      if (viewer.controls) viewer.controls.update();
+    }
+
+    alert(`Loaded: ${v.dataset_name}`);
+  });
+
+  // ── Delete Selected Visualisation ────────────────────
+  document.getElementById('deleteVisBtn').addEventListener('click', async () => {
+    const select = document.getElementById('savedVisList');
+    const id     = select.value;
+    if (!id) return;
+    if (!confirm('Delete this saved visualisation?')) return;
+    try {
+      await fetch(`${API}/api/visualisations/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-auth-token': authToken }
+      });
+      loadSavedVisualisations();
+    } catch (err) {
+      alert('Delete failed: ' + err.message);
+    }
+  });
+
+  // ── Hand Control ──────────────────────────────────────
   const handControlBtn = document.getElementById('handControlBtn');
 
   handControlBtn.addEventListener('click', async function () {
     const panel = document.getElementById('handGesturePanel');
-    const video = document.getElementById('webcam');
-
     gesturePanelActive = !gesturePanelActive;
 
     if (gesturePanelActive) {
-      this.textContent = "Stop Hand Control";
+      this.textContent   = "Stop Hand Control";
       panel.style.display = "block";
-
-      const modelPath = './nano_handpose_model/model.json';
+      const modelPath    = './nano_handpose_model/model.json';
       await window.handTracker.init(modelPath, 'webcam');
     } else {
-      this.textContent = "Hand Control";
+      this.textContent   = "Hand Control";
       panel.style.display = "none";
       window.handTracker.stop();
       document.getElementById('gestureStatus').textContent = "";
