@@ -2,6 +2,103 @@
 // APPLICATION CONTROLLER
 // ============================================
 
+
+// ── Auth state (in-memory, no localStorage) ──────────
+let authToken = null;
+let authUser  = null;
+
+const API = 'http://localhost:3000';
+
+// ── Modal helpers ─────────────────────────────────────
+const authModal    = document.getElementById('authModal');
+const loginBtn     = document.getElementById('loginBtn');
+const modalCloseBtn = document.getElementById('modalCloseBtn');
+
+loginBtn.addEventListener('click', () => {
+  authModal.style.display = 'flex';
+});
+
+modalCloseBtn.addEventListener('click', () => {
+  authModal.style.display = 'none';
+});
+
+authModal.addEventListener('click', e => {
+  if (e.target === authModal) authModal.style.display = 'none';
+});
+
+// Tab switching
+document.querySelectorAll('.modal-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const target = tab.dataset.tab;
+    document.getElementById('loginForm').style.display    = target === 'login'    ? 'flex' : 'none';
+    document.getElementById('registerForm').style.display = target === 'register' ? 'flex' : 'none';
+  });
+});
+
+// ── Login ─────────────────────────────────────────────
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email    = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  const errEl    = document.getElementById('loginError');
+  errEl.textContent = '';
+
+  try {
+    const res  = await fetch(`${API}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error; return; }
+
+    authToken = data.token;
+    authUser  = data.username;
+    authModal.style.display = 'none';
+    updateAuthUI();
+  } catch (err) {
+    errEl.textContent = 'Could not connect to server.';
+  }
+});
+
+// ── Register ──────────────────────────────────────────
+document.getElementById('registerForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const username = document.getElementById('regUsername').value;
+  const email    = document.getElementById('regEmail').value;
+  const password = document.getElementById('regPassword').value;
+  const errEl    = document.getElementById('registerError');
+  errEl.textContent = '';
+
+  try {
+    const res  = await fetch(`${API}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error; return; }
+
+    authToken = data.token;
+    authUser  = data.username;
+    authModal.style.display = 'none';
+    updateAuthUI();
+  } catch (err) {
+    errEl.textContent = 'Could not connect to server.';
+  }
+});
+
+// ── Update nav button after login ─────────────────────
+function updateAuthUI() {
+  loginBtn.textContent = authUser ? `👤 ${authUser}` : 'Login / Register';
+}
+
+
+
+
+
 document.addEventListener("DOMContentLoaded", function () {
   let parsedCsvData = null;
   let columnDetector = null;

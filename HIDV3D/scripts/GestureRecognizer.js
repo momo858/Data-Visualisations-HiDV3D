@@ -97,7 +97,7 @@ class GestureRecognizer {
       }
 
       // Fingers together: zoom in — still only
-      if (spread < 55 && avgDist < 130) {
+      if (spread < 75 && avgDist < 150) {
         this.lastX = null;
         this.lastY = null;
         this.lastDeltaX = 0;

@@ -103,6 +103,57 @@
 
     </main>
 
+    <!-- Auth Modal -->
+<div id="authModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <button class="modal-close" id="modalCloseBtn" aria-label="Close">&times;</button>
+
+    <!-- Tabs -->
+    <div class="modal-tabs">
+      <button class="modal-tab active" data-tab="login">Login</button>
+      <button class="modal-tab" data-tab="register">Register</button>
+    </div>
+
+    <!-- Login form -->
+    <form id="loginForm" class="modal-form">
+      <h2 class="modal-title">Welcome back</h2>
+      <div class="form-group">
+        <label for="loginEmail">Email</label>
+        <input type="email" id="loginEmail" placeholder="you@email.com" required />
+      </div>
+      <div class="form-group">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" required />
+      </div>
+      <p class="form-error" id="loginError"></p>
+      <button type="submit" class="btn-primary-full">Login</button>
+    </form>
+
+    <!-- Register form -->
+    <form id="registerForm" class="modal-form" style="display:none;">
+      <h2 class="modal-title">Create account</h2>
+      <div class="form-group">
+        <label for="regUsername">Username</label>
+        <input type="text" id="regUsername" placeholder="yourname" required />
+      </div>
+      <div class="form-group">
+        <label for="regEmail">Email</label>
+        <input type="email" id="regEmail" placeholder="you@email.com" required />
+      </div>
+      <div class="form-group">
+        <label for="regPassword">Password</label>
+        <input type="password" id="regPassword" placeholder="min. 6 characters" required />
+      </div>
+      <p class="form-error" id="registerError"></p>
+      <button type="submit" class="btn-primary-full">Create Account</button>
+    </form>
+
+  </div>
+</div>
+
+
+
+
     <!-- TensorFlow.js -->
     <script src="https://unpkg.com/@tensorflow/tfjs-core@3.7.0/dist/tf-core.js"></script>
     <script src="https://unpkg.com/@tensorflow/tfjs-converter@3.7.0/dist/tf-converter.js"></script>

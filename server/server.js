@@ -1,18 +1,17 @@
 require('dotenv').config();
 const http = require('http');
-const datasetsHandler      = require('./routes/datasets');
+const datasetsHandler       = require('./routes/datasets');
 const visualisationsHandler = require('./routes/visualisations');
+const { authHandler }       = require('./routes/auth');
 
 const PORT = process.env.PORT || 3000;
 
 const server = http.createServer(async (req, res) => {
-  // CORS headers so the frontend can talk to this server
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-auth-token');
   res.setHeader('Content-Type', 'application/json');
 
-  // Handle preflight OPTIONS requests
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
@@ -21,6 +20,7 @@ const server = http.createServer(async (req, res) => {
 
   console.log(`${req.method} ${req.url}`);
 
+  if (req.url.startsWith('/api/auth'))          return authHandler(req, res);
   if (req.url.startsWith('/api/datasets'))       return datasetsHandler(req, res);
   if (req.url.startsWith('/api/visualisations')) return visualisationsHandler(req, res);
 
