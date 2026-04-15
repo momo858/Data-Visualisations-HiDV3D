@@ -1,21 +1,24 @@
+
 // ============================================
 // CSV3D VIEWER CLASS - Main visualization engine
 // ============================================
 class CSV3DViewer {
   constructor(containerId) {
-    this.container = document.getElementById(containerId);
-    this.scene = null;
-    this.camera = null;
-    this.renderer = null;
-    this.controls = null;
-    this.objects = [];
-    this.animationId = null;
-    this.dataMapper = new DataMapper();
+    this.container      = document.getElementById(containerId);
+    this.scene          = null;
+    this.camera         = null;
+    this.renderer       = null;
+    this.controls       = null;
+    this.objects        = [];
+    this.animationId    = null;
+    this.dataMapper     = new DataMapper();
     this.currentMapping = { x: null, y: null, z: null };
+    this._axisLabels    = [];
   }
 
   initScene() {
-    this.container.innerHTML = "";
+    this.container.innerHTML = '';
+    this._axisLabels = [];
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x1a1a1a);
     this.camera = new THREE.PerspectiveCamera(
@@ -46,15 +49,14 @@ class CSV3DViewer {
     this.scene.add(gridHelper);
 
     this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
-    this.controls.maxDistance = 50;
-    this.controls.minDistance = 5;
-    // Clamp vertical tilt so camera can't flip upside down
-    this.controls.minPolarAngle = 0.2;
-    this.controls.maxPolarAngle = Math.PI - 0.2;
+    this.controls.enableDamping    = true;
+    this.controls.dampingFactor    = 0.05;
+    this.controls.maxDistance      = 50;
+    this.controls.minDistance      = 5;
+    this.controls.minPolarAngle    = 0.2;
+    this.controls.maxPolarAngle    = Math.PI - 0.2;
 
-    window.addEventListener("resize", this.onWindowResize.bind(this));
+    window.addEventListener('resize', this.onWindowResize.bind(this));
     this.animate();
   }
 
@@ -74,53 +76,93 @@ class CSV3DViewer {
   }
 
   clearScene() {
-    this.objects.forEach((obj) => {
+    this.objects.forEach(obj => {
       this.scene.remove(obj);
       if (obj.geometry) obj.geometry.dispose();
       if (obj.material) {
-        if (Array.isArray(obj.material)) {
-          obj.material.forEach((m) => m.dispose());
-        } else {
-          obj.material.dispose();
-        }
+        if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+        else obj.material.dispose();
       }
     });
     this.objects = [];
+    // Remove old axis label sprites
+    this._axisLabels.forEach(s => this.scene.remove(s));
+    this._axisLabels = [];
   }
 
-  visualizeData(data, xCol, yCol, zCol) {
+  // ── Axis label sprites ────────────────────────────────
+  _makeAxisLabel(text, position) {
+    const canvas  = document.createElement('canvas');
+    canvas.width  = 256;
+    canvas.height = 64;
+    const ctx     = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0)';
+    ctx.fillRect(0, 0, 256, 64);
+    ctx.font      = 'bold 28px Arial';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(text.length > 18 ? text.slice(0, 17) + '…' : text, 128, 42);
+
+    const texture  = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite   = new THREE.Sprite(material);
+    sprite.position.set(...position);
+    sprite.scale.set(3, 0.75, 1);
+    this.scene.add(sprite);
+    this._axisLabels.push(sprite);
+  }
+
+  // ── Colour helpers ────────────────────────────────────
+  _getPointColor(index, total, colorValues, colorIsCateg) {
+    if (colorValues) {
+      if (colorIsCateg) {
+        // distinct hue per category
+        const hue = (colorValues[index] / 10);
+        return new THREE.Color().setHSL(hue, 0.85, 0.60);
+      } else {
+        // heatmap: blue → green → red
+        const t = colorValues[index] / 10;
+        return new THREE.Color().setHSL((1 - t) * 0.66, 0.85, 0.55);
+      }
+    }
+    // default: rainbow by row index
+    return new THREE.Color().setHSL(index / total, 0.8, 0.6);
+  }
+
+  // ── Main visualisation ────────────────────────────────
+  visualizeData(data, xCol, yCol, zCol, colorCol = null) {
     this.clearScene();
-    if (!data || data.length === 0) {
-      console.warn("No data to visualize");
-      return;
+    if (!data || data.length === 0) { console.warn('No data to visualize'); return; }
+
+    this.currentMapping = { x: xCol, y: yCol, z: zCol, color: colorCol };
+
+    // Normalised values already in 0–10 range from DataMapper
+    const xNorm = this.dataMapper.mapToNumeric(data, xCol);
+    const yNorm = this.dataMapper.mapToNumeric(data, yCol);
+    const zNorm = this.dataMapper.mapToNumeric(data, zCol);
+
+    let colorValues   = null;
+    let colorIsCateg  = false;
+    if (colorCol) {
+      const analysis  = this.dataMapper.analyzeColumn(data, colorCol);
+      colorIsCateg    = !analysis.isNumeric;
+      colorValues     = this.dataMapper.mapToNumeric(data, colorCol);
     }
 
-    this.currentMapping = { x: xCol, y: yCol, z: zCol };
+    // Centre the cloud: shift 0–10 range to -5…+5
+    const centre = 5;
+    const scale  = 1; // 0-10 maps directly, centred at 5
 
-    const xValues = this.dataMapper.mapToNumeric(data, xCol);
-    const yValues = this.dataMapper.mapToNumeric(data, yCol);
-    const zValues = this.dataMapper.mapToNumeric(data, zCol);
+    data.forEach((row, i) => {
+      const x = xNorm[i] - centre;
+      const y = yNorm[i] - centre;
+      const z = zNorm[i] - centre;
 
-    const xMin = Math.min(...xValues), xMax = Math.max(...xValues);
-    const yMin = Math.min(...yValues), yMax = Math.max(...yValues);
-    const zMin = Math.min(...zValues), zMax = Math.max(...zValues);
-
-    const xRange = xMax - xMin || 1;
-    const yRange = yMax - yMin || 1;
-    const zRange = zMax - zMin || 1;
-    const scale = 10;
-
-    data.forEach((row, index) => {
-      const x = ((xValues[index] - xMin) / xRange - 0.5) * scale;
-      const y = ((yValues[index] - yMin) / yRange - 0.5) * scale;
-      const z = ((zValues[index] - zMin) / zRange - 0.5) * scale;
-
-      const size = Math.max(0.05, 0.2 / Math.sqrt(data.length));
+      const size     = Math.max(0.05, 0.2 / Math.sqrt(data.length));
       const geometry = new THREE.SphereGeometry(size, 8, 8);
-      const hue = index / data.length;
-      const color = new THREE.Color().setHSL(hue, 0.8, 0.6);
+      const color    = this._getPointColor(i, data.length, colorValues, colorIsCateg);
       const material = new THREE.MeshPhongMaterial({
-        color: color,
+        color,
         transparent: true,
         opacity: 0.9,
         emissive: color,
@@ -128,100 +170,106 @@ class CSV3DViewer {
       });
       const sphere = new THREE.Mesh(geometry, material);
       sphere.position.set(x, y, z);
-      sphere.userData = { rowData: row, index: index };
+      sphere.userData = { rowData: row, index: i };
       this.scene.add(sphere);
       this.objects.push(sphere);
     });
 
-    this.camera.position.set(scale * 1.5, scale * 1.5, scale * 1.5);
+    // Axis labels at the end of each axis line (offset from centre)
+    this._makeAxisLabel(xCol, [6.5, -5.5, -5]);
+    this._makeAxisLabel(yCol, [-5.5, 6.5, -5]);
+    this._makeAxisLabel(zCol, [-5.5, -5.5, 6.5]);
+
+    this.camera.position.set(18, 18, 18);
     this.camera.lookAt(0, 0, 0);
-    console.log(`Visualized ${data.length} points across ${xCol}, ${yCol}, ${zCol}`);
-    this.updateLegend(xCol, yCol, zCol);
+    console.log(`Visualized ${data.length} points — x:${xCol} y:${yCol} z:${zCol} color:${colorCol||'none'}`);
+    this.updateLegend(xCol, yCol, zCol, colorCol);
   }
 
   applyGesture(result) {
     try {
-      if (!result || result.gesture === "none") return;
-      if (!this.camera || !this.controls) {
-        console.warn("CSV3DViewer applyGesture: camera or controls not ready");
-        return;
-      }
+      if (!result || result.gesture === 'none') return;
+      if (!this.camera || !this.controls) return;
 
-      if (result.gesture === "palm") {
+      if (result.gesture === 'palm') {
         const sensitivity = 0.005;
-
-        // Horizontal rotation — azimuth angle (left/right)
         if (result.deltaX !== 0) {
-          const azimuthAngle = result.deltaX * sensitivity;
-          const currentAzimuth = this.controls.getAzimuthalAngle();
-          this.controls.minAzimuthAngle = currentAzimuth + azimuthAngle;
-          this.controls.maxAzimuthAngle = currentAzimuth + azimuthAngle;
+          const az = this.controls.getAzimuthalAngle() + result.deltaX * sensitivity;
+          this.controls.minAzimuthAngle = az;
+          this.controls.maxAzimuthAngle = az;
           this.controls.update();
           this.controls.minAzimuthAngle = -Infinity;
-          this.controls.maxAzimuthAngle = Infinity;
-          console.log("Gesture: rotate H, deltaX", Math.round(result.deltaX));
+          this.controls.maxAzimuthAngle =  Infinity;
         }
-
-        // Vertical rotation — polar angle (up/down)
-        // deltaY is inverted: moving hand up = negative Y in pixel space = look up
         if (result.deltaY !== 0) {
-          const polarAngle = result.deltaY * sensitivity;
-          const currentPolar = this.controls.getPolarAngle();
           const newPolar = Math.max(
             this.controls.minPolarAngle,
-            Math.min(this.controls.maxPolarAngle, currentPolar + polarAngle)
+            Math.min(this.controls.maxPolarAngle,
+              this.controls.getPolarAngle() + result.deltaY * sensitivity)
           );
           this.controls.minPolarAngle = newPolar;
           this.controls.maxPolarAngle = newPolar;
           this.controls.update();
           this.controls.minPolarAngle = 0.2;
           this.controls.maxPolarAngle = Math.PI - 0.2;
-          console.log("Gesture: rotate V, deltaY", Math.round(result.deltaY));
         }
-
-      } else if (result.gesture === "fingers_together") {
-        const zoomSpeed = 0.15;
-        const direction = this.camera.position.clone().normalize();
-        const currentDist = this.camera.position.length();
-        if (currentDist > this.controls.minDistance) {
-          this.camera.position.addScaledVector(direction, -zoomSpeed);
+      } else if (result.gesture === 'fingers_together') {
+        const dir  = this.camera.position.clone().normalize();
+        const dist = this.camera.position.length();
+        if (dist > this.controls.minDistance) {
+          this.camera.position.addScaledVector(dir, -0.15);
           this.controls.target.set(0, 0, 0);
           this.controls.update();
-          console.log("Gesture: zoom in, dist", currentDist.toFixed(2));
         }
-
-      } else if (result.gesture === "fist") {
-        const zoomSpeed = 0.15;
-        const direction = this.camera.position.clone().normalize();
-        const currentDist = this.camera.position.length();
-        if (currentDist < this.controls.maxDistance) {
-          this.camera.position.addScaledVector(direction, zoomSpeed);
+      } else if (result.gesture === 'fist') {
+        const dir  = this.camera.position.clone().normalize();
+        const dist = this.camera.position.length();
+        if (dist < this.controls.maxDistance) {
+          this.camera.position.addScaledVector(dir, 0.15);
           this.controls.target.set(0, 0, 0);
           this.controls.update();
-          console.log("Gesture: zoom out, dist", currentDist.toFixed(2));
         }
       }
-
     } catch (err) {
-      console.error("CSV3DViewer applyGesture() error:", err.message);
+      console.error('CSV3DViewer applyGesture() error:', err.message);
     }
   }
 
-  updateLegend(xCol, yCol, zCol) {
-    const legend = document.getElementById("legend");
-    const content = document.getElementById("legendContent");
-    legend.style.display = "block";
+  updateLegend(xCol, yCol, zCol, colorCol = null) {
+    const legend  = document.getElementById('legend');
+    const content = document.getElementById('legendContent');
+    legend.style.display = 'block';
 
-    const xMap = this.dataMapper.getCategoryMapping(xCol);
-    const yMap = this.dataMapper.getCategoryMapping(yCol);
-    const zMap = this.dataMapper.getCategoryMapping(zCol);
+    const xStats = this.dataMapper.getNormStats(xCol);
+    const yStats = this.dataMapper.getNormStats(yCol);
+    const zStats = this.dataMapper.getNormStats(zCol);
 
-    let html = "";
-    html += `<div class="legend-item"><strong>X Axis:</strong> ${xCol} ${xMap ? "(Categorical)" : "(Numeric)"}</div>`;
-    html += `<div class="legend-item"><strong>Y Axis:</strong> ${yCol} ${yMap ? "(Categorical)" : "(Numeric)"}</div>`;
-    html += `<div class="legend-item"><strong>Z Axis:</strong> ${zCol} ${zMap ? "(Categorical)" : "(Numeric)"}</div>`;
+    const statBadge = (stats) => {
+      if (!stats) return '';
+      return `<span class="norm-badge">${stats.method}</span>`;
+    };
+
+    let html = '';
+    html += `<div class="legend-item"><strong>X:</strong> ${xCol} ${statBadge(xStats)}</div>`;
+    html += `<div class="legend-item"><strong>Y:</strong> ${yCol} ${statBadge(yStats)}</div>`;
+    html += `<div class="legend-item"><strong>Z:</strong> ${zCol} ${statBadge(zStats)}</div>`;
+    if (colorCol) {
+      const cm = this.dataMapper.getCategoryMapping(colorCol);
+      html += `<div class="legend-item"><strong>Colour:</strong> ${colorCol}</div>`;
+      if (cm) {
+        // show colour swatches for categories
+        [...cm.entries()].slice(0, 8).forEach(([label, idx]) => {
+          const hue = (idx / (cm.size - 1 || 1));
+          const c   = new THREE.Color().setHSL(hue, 0.85, 0.60);
+          html += `<div class="legend-item">
+            <span class="legend-swatch" style="background:rgb(${Math.round(c.r*255)},${Math.round(c.g*255)},${Math.round(c.b*255)})"></span>
+            ${label}
+          </div>`;
+        });
+        if (cm.size > 8) html += `<div class="legend-item legend-muted">…+${cm.size - 8} more</div>`;
+      }
+    }
     html += `<div class="legend-item"><strong>Points:</strong> ${this.objects.length}</div>`;
-
     content.innerHTML = html;
   }
 
@@ -230,11 +278,10 @@ class CSV3DViewer {
     this.clearScene();
     if (this.renderer) {
       this.renderer.dispose();
-      if (this.container.contains(this.renderer.domElement)) {
+      if (this.container.contains(this.renderer.domElement))
         this.container.removeChild(this.renderer.domElement);
-      }
     }
     if (this.controls) this.controls.dispose();
-    window.removeEventListener("resize", this.onWindowResize);
+    window.removeEventListener('resize', this.onWindowResize);
   }
 }
