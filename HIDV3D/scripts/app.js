@@ -180,6 +180,10 @@ document.addEventListener("DOMContentLoaded", function () {
     visualizeBtn.disabled  = true;
     resetBtn.disabled      = true;
 
+    // ── CHANGE: reset colour dropdown on logout ───────
+    const colorAxis = document.getElementById('colorAxis');
+    if (colorAxis) colorAxis.innerHTML = '<option value="">— None —</option>';
+
     if (window.handTracker) {
       window.handTracker.stop();
       const panel = document.getElementById('handGesturePanel');
@@ -261,6 +265,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // ── Populate axis dropdowns ───────────────────────────
+  // ── CHANGE: also populates the new colorAxis dropdown ─
   function populateColumnSelectors(columns) {
     ['xAxis', 'yAxis', 'zAxis'].forEach(id => {
       const select = document.getElementById(id);
@@ -272,19 +277,36 @@ document.addEventListener("DOMContentLoaded", function () {
         select.appendChild(option);
       });
     });
+
+    // Colour By — all columns + a "None" default
+    const colorSelect = document.getElementById('colorAxis');
+    if (colorSelect) {
+      colorSelect.innerHTML = '<option value="">— None —</option>';
+      columns.forEach(col => {
+        const option       = document.createElement("option");
+        option.value       = col.name;
+        option.textContent = `${col.name} ${col.isNumeric ? "(#)" : "(cat)"}`;
+        colorSelect.appendChild(option);
+      });
+      // Auto-select first categorical column if present
+      const firstCat = columns.find(c => !c.isNumeric);
+      if (firstCat) colorSelect.value = firstCat.name;
+    }
   }
 
   // ── Visualise ─────────────────────────────────────────
+  // ── CHANGE: reads colorAxis and passes it to visualizeData
   visualizeBtn.addEventListener("click", () => {
     if (!parsedCsvData) { alert("Please upload a CSV file first!"); return; }
 
     viewer.initScene();
 
-    const xCol = document.getElementById("xAxis").value;
-    const yCol = document.getElementById("yAxis").value;
-    const zCol = document.getElementById("zAxis").value;
+    const xCol     = document.getElementById("xAxis").value;
+    const yCol     = document.getElementById("yAxis").value;
+    const zCol     = document.getElementById("zAxis").value;
+    const colorCol = document.getElementById("colorAxis")?.value || null;
 
-    viewer.visualizeData(parsedCsvData, xCol, yCol, zCol);
+    viewer.visualizeData(parsedCsvData, xCol, yCol, zCol, colorCol);
   });
 
   // ── Reset View ────────────────────────────────────────
@@ -297,13 +319,15 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // ── Save Visualisation ────────────────────────────────
+  // ── CHANGE: also saves color_col ─────────────────────
   saveVisBtn.addEventListener('click', async () => {
     if (!authToken) { alert('Please log in to save.'); return; }
     if (!window._currentDatasetId) { alert('Visualise a dataset first.'); return; }
 
-    const xCol = document.getElementById('xAxis').value;
-    const yCol = document.getElementById('yAxis').value;
-    const zCol = document.getElementById('zAxis').value;
+    const xCol     = document.getElementById('xAxis').value;
+    const yCol     = document.getElementById('yAxis').value;
+    const zCol     = document.getElementById('zAxis').value;
+    const colorCol = document.getElementById('colorAxis')?.value || null;
 
     const cam = viewer.camera
       ? { x: viewer.camera.position.x, y: viewer.camera.position.y, z: viewer.camera.position.z }
@@ -316,6 +340,7 @@ document.addEventListener("DOMContentLoaded", function () {
         body: JSON.stringify({
           dataset_id: window._currentDatasetId,
           x_col: xCol, y_col: yCol, z_col: zCol,
+          color_col: colorCol,
           camera_pos: cam
         })
       });
@@ -328,28 +353,29 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // ── Load Selected Visualisation ───────────────────────
+  // ── CHANGE: also restores color_col and passes it to visualizeData
   document.getElementById('loadVisBtn').addEventListener('click', () => {
     const select = document.getElementById('savedVisList');
     const opt    = select.options[select.selectedIndex];
     if (!opt || !opt.dataset.vis) return;
     const v = JSON.parse(opt.dataset.vis);
 
-    // Restore axis selectors
     document.getElementById('xAxis').value = v.x_col;
     document.getElementById('yAxis').value = v.y_col;
     document.getElementById('zAxis').value = v.z_col;
 
-    // Restore camera
+    const colorSelect = document.getElementById('colorAxis');
+    if (colorSelect && v.color_col) colorSelect.value = v.color_col;
+
     if (v.camera_pos && viewer.camera) {
       const cp = typeof v.camera_pos === 'string' ? JSON.parse(v.camera_pos) : v.camera_pos;
       viewer.camera.position.set(cp.x, cp.y, cp.z);
       if (viewer.controls) viewer.controls.update();
     }
 
-    // Re-visualise immediately if CSV is loaded, otherwise prompt
     if (parsedCsvData) {
       viewer.initScene();
-      viewer.visualizeData(parsedCsvData, v.x_col, v.y_col, v.z_col);
+      viewer.visualizeData(parsedCsvData, v.x_col, v.y_col, v.z_col, v.color_col || null);
     } else {
       alert(`Axes restored: ${v.x_col} / ${v.y_col} / ${v.z_col}\nUpload the CSV file then click Visualize.`);
     }

@@ -1,4 +1,3 @@
-
 // ============================================
 // CSV3D VIEWER CLASS - Main visualization engine
 // ============================================
@@ -85,7 +84,6 @@ class CSV3DViewer {
       }
     });
     this.objects = [];
-    // Remove old axis label sprites
     this._axisLabels.forEach(s => this.scene.remove(s));
     this._axisLabels = [];
   }
@@ -102,7 +100,6 @@ class CSV3DViewer {
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.fillText(text.length > 18 ? text.slice(0, 17) + '…' : text, 128, 42);
-
     const texture  = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
     const sprite   = new THREE.Sprite(material);
@@ -112,21 +109,19 @@ class CSV3DViewer {
     this._axisLabels.push(sprite);
   }
 
-  // ── Colour helpers ────────────────────────────────────
-  _getPointColor(index, total, colorValues, colorIsCateg) {
-    if (colorValues) {
-      if (colorIsCateg) {
-        // distinct hue per category
-        const hue = (colorValues[index] / 10);
-        return new THREE.Color().setHSL(hue, 0.85, 0.60);
-      } else {
-        // heatmap: blue → green → red
-        const t = colorValues[index] / 10;
-        return new THREE.Color().setHSL((1 - t) * 0.66, 0.85, 0.55);
-      }
-    }
-    // default: rainbow by row index
-    return new THREE.Color().setHSL(index / total, 0.8, 0.6);
+  // ── Build a palette keyed by raw string value ─────────
+  // Bypasses DataMapper entirely for colour — reads raw row values
+  // directly so there is no normalisation middleman to break things.
+  _buildCategoryPalette(data, colorCol) {
+    const unique = [...new Set(
+      data.map(r => r[colorCol]).filter(v => v != null).map(v => String(v))
+    )];
+    const palette = new Map();
+    unique.forEach((val, i) => {
+      const hue = i / unique.length;   // evenly spread across 360°
+      palette.set(val, new THREE.Color().setHSL(hue, 0.80, 0.58));
+    });
+    return palette;
   }
 
   // ── Main visualisation ────────────────────────────────
@@ -136,31 +131,49 @@ class CSV3DViewer {
 
     this.currentMapping = { x: xCol, y: yCol, z: zCol, color: colorCol };
 
-    // Normalised values already in 0–10 range from DataMapper
+    // X / Y / Z positions — unchanged, still go through DataMapper
     const xNorm = this.dataMapper.mapToNumeric(data, xCol);
     const yNorm = this.dataMapper.mapToNumeric(data, yCol);
     const zNorm = this.dataMapper.mapToNumeric(data, zCol);
 
-    let colorValues   = null;
-    let colorIsCateg  = false;
+    // Colour — build palette directly from raw values, skip DataMapper
+    let categoryPalette  = null;   // Map<string, THREE.Color> for categorical
+    let numericColorNorm = null;   // 0-10 array for numeric colour cols
+
     if (colorCol) {
-      const analysis  = this.dataMapper.analyzeColumn(data, colorCol);
-      colorIsCateg    = !analysis.isNumeric;
-      colorValues     = this.dataMapper.mapToNumeric(data, colorCol);
+      const analysis = this.dataMapper.analyzeColumn(data, colorCol);
+      if (analysis.isNumeric) {
+        // Numeric colour col: heatmap via DataMapper normalisation
+        numericColorNorm = this.dataMapper.mapToNumeric(data, colorCol);
+      } else {
+        // Categorical: build palette straight from raw strings
+        categoryPalette = this._buildCategoryPalette(data, colorCol);
+      }
     }
 
-    // Centre the cloud: shift 0–10 range to -5…+5
     const centre = 5;
-    const scale  = 1; // 0-10 maps directly, centred at 5
 
     data.forEach((row, i) => {
       const x = xNorm[i] - centre;
       const y = yNorm[i] - centre;
       const z = zNorm[i] - centre;
 
+      let color;
+      if (categoryPalette) {
+        // Categorical colour: look up raw string value in palette
+        const key = String(row[colorCol] ?? '');
+        color = categoryPalette.get(key) || new THREE.Color(0x007bff);
+      } else if (numericColorNorm) {
+        // Numeric colour: heatmap blue → green → red
+        const t = numericColorNorm[i] / 10;
+        color = new THREE.Color().setHSL((1 - t) * 0.66, 0.85, 0.55);
+      } else {
+        // No colour col: rainbow by row index
+        color = new THREE.Color().setHSL(i / data.length, 0.8, 0.6);
+      }
+
       const size     = Math.max(0.05, 0.2 / Math.sqrt(data.length));
       const geometry = new THREE.SphereGeometry(size, 8, 8);
-      const color    = this._getPointColor(i, data.length, colorValues, colorIsCateg);
       const material = new THREE.MeshPhongMaterial({
         color,
         transparent: true,
@@ -175,7 +188,6 @@ class CSV3DViewer {
       this.objects.push(sphere);
     });
 
-    // Axis labels at the end of each axis line (offset from centre)
     this._makeAxisLabel(xCol, [6.5, -5.5, -5]);
     this._makeAxisLabel(yCol, [-5.5, 6.5, -5]);
     this._makeAxisLabel(zCol, [-5.5, -5.5, 6.5]);
@@ -183,7 +195,7 @@ class CSV3DViewer {
     this.camera.position.set(18, 18, 18);
     this.camera.lookAt(0, 0, 0);
     console.log(`Visualized ${data.length} points — x:${xCol} y:${yCol} z:${zCol} color:${colorCol||'none'}`);
-    this.updateLegend(xCol, yCol, zCol, colorCol);
+    this.updateLegend(xCol, yCol, zCol, colorCol, categoryPalette);
   }
 
   applyGesture(result) {
@@ -235,7 +247,8 @@ class CSV3DViewer {
     }
   }
 
-  updateLegend(xCol, yCol, zCol, colorCol = null) {
+  // ── Legend — swatches from the same palette used for dots ──
+  updateLegend(xCol, yCol, zCol, colorCol = null, categoryPalette = null) {
     const legend  = document.getElementById('legend');
     const content = document.getElementById('legendContent');
     legend.style.display = 'block';
@@ -244,31 +257,33 @@ class CSV3DViewer {
     const yStats = this.dataMapper.getNormStats(yCol);
     const zStats = this.dataMapper.getNormStats(zCol);
 
-    const statBadge = (stats) => {
-      if (!stats) return '';
-      return `<span class="norm-badge">${stats.method}</span>`;
-    };
+    const statBadge = (stats) => stats
+      ? `<span class="norm-badge">${stats.method}</span>`
+      : '';
 
     let html = '';
     html += `<div class="legend-item"><strong>X:</strong> ${xCol} ${statBadge(xStats)}</div>`;
     html += `<div class="legend-item"><strong>Y:</strong> ${yCol} ${statBadge(yStats)}</div>`;
     html += `<div class="legend-item"><strong>Z:</strong> ${zCol} ${statBadge(zStats)}</div>`;
+
     if (colorCol) {
-      const cm = this.dataMapper.getCategoryMapping(colorCol);
       html += `<div class="legend-item"><strong>Colour:</strong> ${colorCol}</div>`;
-      if (cm) {
-        // show colour swatches for categories
-        [...cm.entries()].slice(0, 8).forEach(([label, idx]) => {
-          const hue = (idx / (cm.size - 1 || 1));
-          const c   = new THREE.Color().setHSL(hue, 0.85, 0.60);
+      if (categoryPalette && categoryPalette.size > 0) {
+        const entries = [...categoryPalette.entries()];
+        entries.slice(0, 8).forEach(([label, color]) => {
           html += `<div class="legend-item">
-            <span class="legend-swatch" style="background:rgb(${Math.round(c.r*255)},${Math.round(c.g*255)},${Math.round(c.b*255)})"></span>
+            <span class="legend-swatch" style="background:rgb(${Math.round(color.r*255)},${Math.round(color.g*255)},${Math.round(color.b*255)})"></span>
             ${label}
           </div>`;
         });
-        if (cm.size > 8) html += `<div class="legend-item legend-muted">…+${cm.size - 8} more</div>`;
+        if (entries.length > 8) {
+          html += `<div class="legend-item legend-muted">…+${entries.length - 8} more</div>`;
+        }
+      } else {
+        html += `<div class="legend-item legend-muted">Gradient: blue (low) → red (high)</div>`;
       }
     }
+
     html += `<div class="legend-item"><strong>Points:</strong> ${this.objects.length}</div>`;
     content.innerHTML = html;
   }

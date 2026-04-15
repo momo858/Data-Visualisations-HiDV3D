@@ -1,4 +1,4 @@
-<!doctype html>
+'''<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -20,7 +20,7 @@
         </div>
     </nav>
 
-    <!-- 3D VIEWPORT — full height, webcam overlaid bottom-left -->
+    <!-- 3D VIEWPORT -->
     <section class="viewport-section">
 
         <div id="view3d"></div>
@@ -50,7 +50,7 @@
 
     </section>
 
-    <!-- CONTROLS PANEL — scroll down to reach -->
+    <!-- CONTROLS PANEL -->
     <main class="controls-section">
 
         <input id="csvInput" type="file" accept=".csv" style="display:none;">
@@ -63,16 +63,14 @@
                 <button id="visualizeBtn" disabled>Visualize Data</button>
                 <button id="resetBtn" disabled>Reset View</button>
                 <button id="handControlBtn">Hand Control</button>
-                
                 <button id="saveVisBtn" disabled>💾 Save Visualisation</button>
                 <div class="vis-load-wrap" id="visLoadWrap" style="display:none;">
-                <select id="savedVisList">
-                    <option value="">📂 My Visualisations…</option>
-                </select>
-                <button id="loadVisBtn">Load</button>
-                <button id="deleteVisBtn" class="danger">🗑</button>
+                    <select id="savedVisList">
+                        <option value="">📂 My Visualisations…</option>
+                    </select>
+                    <button id="loadVisBtn">Load</button>
+                    <button id="deleteVisBtn" class="danger">🗑</button>
                 </div>
-
             </div>
         </div>
 
@@ -87,7 +85,7 @@
             </div>
         </div>
 
-        <!-- Axis selector -->
+        <!-- Axis + Colour selector -->
         <div id="columnSelector">
             <h3>Select Columns for 3D Axes</h3>
             <div class="column-grid">
@@ -103,6 +101,13 @@
                     <label for="zAxis">Z Axis:</label>
                     <select id="zAxis"></select>
                 </div>
+                <!-- NEW: Colour By dropdown -->
+                <div class="column-option column-option--color">
+                    <label for="colorAxis">🎨 Colour By:</label>
+                    <select id="colorAxis">
+                        <option value="">— None —</option>
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -115,55 +120,49 @@
     </main>
 
     <!-- Auth Modal -->
-<div id="authModal" class="modal-overlay" style="display:none;">
-  <div class="modal-box">
-    <button class="modal-close" id="modalCloseBtn" aria-label="Close">&times;</button>
+    <div id="authModal" class="modal-overlay" style="display:none;">
+      <div class="modal-box">
+        <button class="modal-close" id="modalCloseBtn" aria-label="Close">&times;</button>
 
-    <!-- Tabs -->
-    <div class="modal-tabs">
-      <button class="modal-tab active" data-tab="login">Login</button>
-      <button class="modal-tab" data-tab="register">Register</button>
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-tab="login">Login</button>
+          <button class="modal-tab" data-tab="register">Register</button>
+        </div>
+
+        <form id="loginForm" class="modal-form">
+          <h2 class="modal-title">Welcome back</h2>
+          <div class="form-group">
+            <label for="loginEmail">Email</label>
+            <input type="email" id="loginEmail" placeholder="you@email.com" required />
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" required />
+          </div>
+          <p class="form-error" id="loginError"></p>
+          <button type="submit" class="btn-primary-full">Login</button>
+        </form>
+
+        <form id="registerForm" class="modal-form" style="display:none;">
+          <h2 class="modal-title">Create account</h2>
+          <div class="form-group">
+            <label for="regUsername">Username</label>
+            <input type="text" id="regUsername" placeholder="yourname" required />
+          </div>
+          <div class="form-group">
+            <label for="regEmail">Email</label>
+            <input type="email" id="regEmail" placeholder="you@email.com" required />
+          </div>
+          <div class="form-group">
+            <label for="regPassword">Password</label>
+            <input type="password" id="regPassword" placeholder="min. 6 characters" required />
+          </div>
+          <p class="form-error" id="registerError"></p>
+          <button type="submit" class="btn-primary-full">Create Account</button>
+        </form>
+
+      </div>
     </div>
-
-    <!-- Login form -->
-    <form id="loginForm" class="modal-form">
-      <h2 class="modal-title">Welcome back</h2>
-      <div class="form-group">
-        <label for="loginEmail">Email</label>
-        <input type="email" id="loginEmail" placeholder="you@email.com" required />
-      </div>
-      <div class="form-group">
-        <label for="loginPassword">Password</label>
-        <input type="password" id="loginPassword" placeholder="••••••••" required />
-      </div>
-      <p class="form-error" id="loginError"></p>
-      <button type="submit" class="btn-primary-full">Login</button>
-    </form>
-
-    <!-- Register form -->
-    <form id="registerForm" class="modal-form" style="display:none;">
-      <h2 class="modal-title">Create account</h2>
-      <div class="form-group">
-        <label for="regUsername">Username</label>
-        <input type="text" id="regUsername" placeholder="yourname" required />
-      </div>
-      <div class="form-group">
-        <label for="regEmail">Email</label>
-        <input type="email" id="regEmail" placeholder="you@email.com" required />
-      </div>
-      <div class="form-group">
-        <label for="regPassword">Password</label>
-        <input type="password" id="regPassword" placeholder="min. 6 characters" required />
-      </div>
-      <p class="form-error" id="registerError"></p>
-      <button type="submit" class="btn-primary-full">Create Account</button>
-    </form>
-
-  </div>
-</div>
-
-
-
 
     <!-- TensorFlow.js -->
     <script src="https://unpkg.com/@tensorflow/tfjs-core@3.7.0/dist/tf-core.js"></script>
