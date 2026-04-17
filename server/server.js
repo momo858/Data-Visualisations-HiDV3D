@@ -3,6 +3,7 @@ const http = require('http');
 const datasetsHandler       = require('./routes/datasets');
 const visualisationsHandler = require('./routes/visualisations');
 const { authHandler }       = require('./routes/auth');
+const { initDB }            = require('./db');
 
 const PORT = process.env.PORT || 3000;
 
@@ -28,6 +29,12 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: 'Route not found' }));
 });
 
-server.listen(PORT, () => {
-  console.log(`HIDV3D server running at http://localhost:${PORT}`);
+// Wait for DB to be ready before accepting requests
+initDB().then(() => {
+  server.listen(PORT, () => {
+    console.log(`HIDV3D server running at http://localhost:${PORT}`);
+  });
+}).catch(err => {
+  console.error('Failed to initialise database:', err.message);
+  process.exit(1);
 });

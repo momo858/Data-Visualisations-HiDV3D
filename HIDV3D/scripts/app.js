@@ -8,6 +8,16 @@ let authUser  = null;
 
 const API = 'http://localhost:3000';
 
+// ── Toast notification ────────────────────────────────
+function showToast(message, type = 'success', duration = 3000) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = `toast ${type} show`;
+  setTimeout(() => {
+    toast.className = `toast ${type}`;
+  }, duration);
+}
+
 // ── Modal helpers ─────────────────────────────────────
 const authModal     = document.getElementById('authModal');
 const loginBtn      = document.getElementById('loginBtn');
@@ -58,6 +68,7 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     authUser  = data.username;
     authModal.style.display = 'none';
     updateAuthUI();
+    showToast(`Welcome back, ${authUser}!`, 'success');
   } catch (err) {
     errEl.textContent = 'Could not connect to server.';
   }
@@ -85,6 +96,7 @@ document.getElementById('registerForm').addEventListener('submit', async e => {
     authUser  = data.username;
     authModal.style.display = 'none';
     updateAuthUI();
+    showToast(`Account created! Welcome, ${authUser}!`, 'success');
   } catch (err) {
     errEl.textContent = 'Could not connect to server.';
   }
@@ -128,7 +140,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   uploadBtn.addEventListener("click", () => csvInput.click());
 
-  // ── Real loadSavedVisualisations (DOM is ready here) ─
+  // ── Real loadSavedVisualisations ─────────────────────
   window._loadSavedVisualisations = async function () {
     if (!authToken) return;
     try {
@@ -141,7 +153,7 @@ document.addEventListener("DOMContentLoaded", function () {
       list.forEach(v => {
         const opt       = document.createElement('option');
         opt.value       = v.id;
-        opt.textContent = `${v.dataset_name} — ${v.x_col}/${v.y_col}/${v.z_col}`;
+        opt.textContent = `Save ${v.save_number} — ${v.dataset_name} — ${v.x_col}/${v.y_col}/${v.z_col}`;
         opt.dataset.vis = JSON.stringify(v);
         select.appendChild(opt);
       });
@@ -180,7 +192,6 @@ document.addEventListener("DOMContentLoaded", function () {
     visualizeBtn.disabled  = true;
     resetBtn.disabled      = true;
 
-    // ── CHANGE: reset colour dropdown on logout ───────
     const colorAxis = document.getElementById('colorAxis');
     if (colorAxis) colorAxis.innerHTML = '<option value="">— None —</option>';
 
@@ -195,6 +206,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     window._currentDatasetId = null;
     updateAuthUI();
+    showToast('Logged out successfully.', 'info');
   });
 
   // ── CSV Upload ────────────────────────────────────────
@@ -210,7 +222,7 @@ document.addEventListener("DOMContentLoaded", function () {
         parsedCsvData = results.data.filter(row => Object.keys(row).length > 0);
 
         if (parsedCsvData.length === 0) {
-          alert("CSV file is empty or invalid!");
+          showToast('CSV file is empty or invalid.', 'error');
           return;
         }
 
@@ -237,7 +249,7 @@ document.addEventListener("DOMContentLoaded", function () {
         visualizeBtn.disabled = false;
         resetBtn.disabled     = false;
 
-        console.log("CSV loaded:", parsedCsvData.length, "rows");
+        showToast(`CSV loaded — ${parsedCsvData.length} rows, ${columns.length} columns.`, 'success');
 
         fetch(`${API}/api/datasets`, {
           method: 'POST',
@@ -251,7 +263,6 @@ document.addEventListener("DOMContentLoaded", function () {
         })
         .then(res => res.json())
         .then(saved => {
-          console.log('Dataset saved to DB:', saved);
           window._currentDatasetId = saved.id;
           if (authToken && saveVisBtn) saveVisBtn.disabled = false;
         })
@@ -259,13 +270,12 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       error: function (err) {
         console.error("CSV parsing error:", err);
-        alert("Error parsing CSV file!");
+        showToast('Error parsing CSV file.', 'error');
       }
     });
   });
 
   // ── Populate axis dropdowns ───────────────────────────
-  // ── CHANGE: also populates the new colorAxis dropdown ─
   function populateColumnSelectors(columns) {
     ['xAxis', 'yAxis', 'zAxis'].forEach(id => {
       const select = document.getElementById(id);
@@ -278,7 +288,6 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     });
 
-    // Colour By — all columns + a "None" default
     const colorSelect = document.getElementById('colorAxis');
     if (colorSelect) {
       colorSelect.innerHTML = '<option value="">— None —</option>';
@@ -288,16 +297,17 @@ document.addEventListener("DOMContentLoaded", function () {
         option.textContent = `${col.name} ${col.isNumeric ? "(#)" : "(cat)"}`;
         colorSelect.appendChild(option);
       });
-      // Auto-select first categorical column if present
       const firstCat = columns.find(c => !c.isNumeric);
       if (firstCat) colorSelect.value = firstCat.name;
     }
   }
 
   // ── Visualise ─────────────────────────────────────────
-  // ── CHANGE: reads colorAxis and passes it to visualizeData
   visualizeBtn.addEventListener("click", () => {
-    if (!parsedCsvData) { alert("Please upload a CSV file first!"); return; }
+    if (!parsedCsvData) {
+      showToast('Please upload a CSV file first.', 'error');
+      return;
+    }
 
     viewer.initScene();
 
@@ -307,6 +317,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const colorCol = document.getElementById("colorAxis")?.value || null;
 
     viewer.visualizeData(parsedCsvData, xCol, yCol, zCol, colorCol);
+    showToast('Visualisation generated.', 'success');
   });
 
   // ── Reset View ────────────────────────────────────────
@@ -315,14 +326,20 @@ document.addEventListener("DOMContentLoaded", function () {
       viewer.camera.position.set(15, 15, 15);
       viewer.controls.target.set(0, 0, 0);
       viewer.controls.update();
+      showToast('View reset.', 'info');
     }
   });
 
   // ── Save Visualisation ────────────────────────────────
-  // ── CHANGE: also saves color_col ─────────────────────
   saveVisBtn.addEventListener('click', async () => {
-    if (!authToken) { alert('Please log in to save.'); return; }
-    if (!window._currentDatasetId) { alert('Visualise a dataset first.'); return; }
+    if (!authToken) {
+      showToast('Please log in to save a visualisation.', 'info');
+      return;
+    }
+    if (!window._currentDatasetId) {
+      showToast('Please visualise a dataset before saving.', 'info');
+      return;
+    }
 
     const xCol     = document.getElementById('xAxis').value;
     const yCol     = document.getElementById('yAxis').value;
@@ -345,15 +362,14 @@ document.addEventListener("DOMContentLoaded", function () {
         })
       });
       if (!res.ok) throw new Error((await res.json()).error);
-      alert('Visualisation saved!');
+      showToast('Visualisation saved successfully!', 'success');
       loadSavedVisualisations();
     } catch (err) {
-      alert('Save failed: ' + err.message);
+      showToast('Save failed: ' + err.message, 'error');
     }
   });
 
   // ── Load Selected Visualisation ───────────────────────
-  // ── CHANGE: also restores color_col and passes it to visualizeData
   document.getElementById('loadVisBtn').addEventListener('click', () => {
     const select = document.getElementById('savedVisList');
     const opt    = select.options[select.selectedIndex];
@@ -367,17 +383,22 @@ document.addEventListener("DOMContentLoaded", function () {
     const colorSelect = document.getElementById('colorAxis');
     if (colorSelect && v.color_col) colorSelect.value = v.color_col;
 
-    if (v.camera_pos && viewer.camera) {
-      const cp = typeof v.camera_pos === 'string' ? JSON.parse(v.camera_pos) : v.camera_pos;
-      viewer.camera.position.set(cp.x, cp.y, cp.z);
-      if (viewer.controls) viewer.controls.update();
-    }
-
     if (parsedCsvData) {
-      viewer.initScene();
-      viewer.visualizeData(parsedCsvData, v.x_col, v.y_col, v.z_col, v.color_col || null);
+      try {
+        viewer.initScene();
+        viewer.visualizeData(parsedCsvData, v.x_col, v.y_col, v.z_col, v.color_col || null);
+
+        if (v.camera_pos && viewer.camera) {
+          const cp = typeof v.camera_pos === 'string' ? JSON.parse(v.camera_pos) : v.camera_pos;
+          viewer.camera.position.set(cp.x, cp.y, cp.z);
+          if (viewer.controls) viewer.controls.update();
+        }
+        showToast('Visualisation loaded successfully!', 'success');
+      } catch (err) {
+        showToast('Axes restored — upload the CSV file then click Visualise.', 'info');
+      }
     } else {
-      alert(`Axes restored: ${v.x_col} / ${v.y_col} / ${v.z_col}\nUpload the CSV file then click Visualize.`);
+      showToast('Axes restored — upload the CSV file then click Visualise.', 'info');
     }
   });
 
@@ -386,15 +407,16 @@ document.addEventListener("DOMContentLoaded", function () {
     const select = document.getElementById('savedVisList');
     const id     = select.value;
     if (!id) return;
-    if (!confirm('Delete this saved visualisation?')) return;
+
     try {
       await fetch(`${API}/api/visualisations/${id}`, {
         method: 'DELETE',
         headers: { 'x-auth-token': authToken }
       });
+      showToast('Visualisation deleted.', 'info');
       loadSavedVisualisations();
     } catch (err) {
-      alert('Delete failed: ' + err.message);
+      showToast('Delete failed: ' + err.message, 'error');
     }
   });
 
@@ -410,13 +432,15 @@ document.addEventListener("DOMContentLoaded", function () {
       panel.style.display = "block";
       const modelPath     = './nano_handpose_model/model.json';
       await window.handTracker.init(modelPath, 'webcam');
+      showToast('Hand control activated.', 'success');
     } else {
       this.textContent    = "Hand Control";
       panel.style.display = "none";
       window.handTracker.stop();
       document.getElementById('gestureStatus').textContent = "";
+      showToast('Hand control stopped.', 'info');
     }
   });
 
-  console.log("HIDV3D Universal CSV Visualizer initialized!");
+  console.log("HIDV3D initialised.");
 });

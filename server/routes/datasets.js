@@ -13,10 +13,9 @@ function readBody(req) {
 }
 
 async function datasetsHandler(req, res) {
-  // GET /api/datasets — return all datasets
   if (req.method === 'GET') {
     try {
-      const result = await db.query('SELECT * FROM datasets ORDER BY uploaded_at DESC');
+      const result = await db.query('SELECT * FROM datasets ORDER BY created_at DESC');
       res.writeHead(200);
       res.end(JSON.stringify(result.rows));
     } catch (err) {
@@ -27,7 +26,6 @@ async function datasetsHandler(req, res) {
     return;
   }
 
-  // POST /api/datasets — save a new dataset record
   if (req.method === 'POST') {
     try {
       const body = await readBody(req);
@@ -53,7 +51,6 @@ async function datasetsHandler(req, res) {
     return;
   }
 
-  // DELETE /api/datasets/:id
   if (req.method === 'DELETE') {
     try {
       const id = req.url.split('/').pop();

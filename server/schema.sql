@@ -6,5 +6,23 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMP DEFAULT NOW()
 );
 
-ALTER TABLE visualisations
-  ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE SET NULL;
+CREATE TABLE IF NOT EXISTS datasets (
+  id         SERIAL PRIMARY KEY,
+  name       VARCHAR(255) NOT NULL,
+  filename   VARCHAR(255),
+  row_count  INTEGER,
+  columns    JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS visualisations (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  dataset_id INTEGER REFERENCES datasets(id) ON DELETE SET NULL,
+  x_col      VARCHAR(255),
+  y_col      VARCHAR(255),
+  z_col      VARCHAR(255),
+  color_col  VARCHAR(255),
+  camera_pos JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
