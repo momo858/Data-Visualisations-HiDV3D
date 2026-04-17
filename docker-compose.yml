@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: hidv3d
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  server:
+    build: ./server
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: hidv3d
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PORT: 3000
+    depends_on:
+      - db
+    volumes:
+      - ./HIDV3D:/HIDV3D
+
+volumes:
+  pgdata:
