@@ -2,7 +2,6 @@
 // APPLICATION CONTROLLER
 // ============================================
 
-// ── Auth state (in-memory, no localStorage) ──────────
 let authToken = null;
 let authUser  = null;
 
@@ -17,6 +16,19 @@ function showToast(message, type = 'success', duration = 3000) {
     toast.className = `toast ${type}`;
   }, duration);
 }
+
+// ── Help Modal ────────────────────────────────────────
+document.getElementById('helpBtn').addEventListener('click', () => {
+  document.getElementById('welcomeModal').style.display = 'flex';
+});
+
+document.getElementById('welcomeCloseBtn').addEventListener('click', () => {
+  document.getElementById('welcomeModal').style.display = 'none';
+});
+
+document.getElementById('welcomeStartBtn').addEventListener('click', () => {
+  document.getElementById('welcomeModal').style.display = 'none';
+});
 
 // ── Modal helpers ─────────────────────────────────────
 const authModal     = document.getElementById('authModal');
@@ -34,6 +46,12 @@ modalCloseBtn.addEventListener('click', () => {
 
 authModal.addEventListener('click', e => {
   if (e.target === authModal) authModal.style.display = 'none';
+});
+
+document.getElementById('welcomeModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('welcomeModal')) {
+    document.getElementById('welcomeModal').style.display = 'none';
+  }
 });
 
 // Tab switching
@@ -112,7 +130,6 @@ function updateAuthUI() {
   if (authToken) loadSavedVisualisations();
 }
 
-// ── Stub — real function assigned inside DOMContentLoaded ──
 function loadSavedVisualisations() {
   if (window._loadSavedVisualisations) window._loadSavedVisualisations();
 }
@@ -177,6 +194,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     authToken = null;
     authUser  = null;
+    parsedCsvData = null;
+    window._currentDatasetId = null;
 
     const visLoadWrap  = document.getElementById('visLoadWrap');
     const savedVisList = document.getElementById('savedVisList');
@@ -184,9 +203,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (visLoadWrap)  visLoadWrap.style.display = 'none';
     if (savedVisList) savedVisList.innerHTML = '<option value="">📂 My Visualisations…</option>';
 
-    if (window.viewer) window.viewer.initScene();
-
-    parsedCsvData = null;
     columnSelector.classList.remove('visible');
     dataInfo.style.display = 'none';
     visualizeBtn.disabled  = true;
@@ -204,7 +220,15 @@ document.addEventListener("DOMContentLoaded", function () {
       gesturePanelActive = false;
     }
 
-    window._currentDatasetId = null;
+    if (window.viewer) {
+      try {
+        window.viewer.destroy();
+        window.viewer.initScene();
+      } catch (err) {
+        console.error('Viewer reset error:', err.message);
+      }
+    }
+
     updateAuthUI();
     showToast('Logged out successfully.', 'info');
   });
@@ -384,19 +408,15 @@ document.addEventListener("DOMContentLoaded", function () {
     if (colorSelect && v.color_col) colorSelect.value = v.color_col;
 
     if (parsedCsvData) {
-      try {
-        viewer.initScene();
-        viewer.visualizeData(parsedCsvData, v.x_col, v.y_col, v.z_col, v.color_col || null);
+      viewer.initScene();
+      viewer.visualizeData(parsedCsvData, v.x_col, v.y_col, v.z_col, v.color_col || null);
 
-        if (v.camera_pos && viewer.camera) {
-          const cp = typeof v.camera_pos === 'string' ? JSON.parse(v.camera_pos) : v.camera_pos;
-          viewer.camera.position.set(cp.x, cp.y, cp.z);
-          if (viewer.controls) viewer.controls.update();
-        }
-        showToast('Visualisation loaded successfully!', 'success');
-      } catch (err) {
-        showToast('Axes restored — upload the CSV file then click Visualise.', 'info');
+      if (v.camera_pos && viewer.camera) {
+        const cp = typeof v.camera_pos === 'string' ? JSON.parse(v.camera_pos) : v.camera_pos;
+        viewer.camera.position.set(cp.x, cp.y, cp.z);
+        if (viewer.controls) viewer.controls.update();
       }
+      showToast('Visualisation loaded successfully!', 'success');
     } else {
       showToast('Axes restored — upload the CSV file then click Visualise.', 'info');
     }
