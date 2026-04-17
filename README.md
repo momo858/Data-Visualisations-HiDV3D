@@ -31,48 +31,26 @@ Built as a final year project for BSc Computer Science at Technological Universi
 | Backend | Plain Node.js HTTP server — no Express |
 | Database | PostgreSQL via pg Pool |
 | Authentication | bcrypt (cost 12) + crypto.randomBytes session tokens |
+| Deployment | Docker + docker-compose |
 
----
 
-## Project Structure
-Data-Visualizations-/
-├── HIDV3D/
-│   ├── index.html
-│   ├── style.css
-│   ├── nano_handpose_model/
-│   │   ├── model.json
-│   │   └── group1-shard*.bin
-│   └── scripts/
-│       ├── app.js
-│       ├── CSV3DViewer.js
-│       ├── DataMapper.js
-│       ├── ColumnDetector.js
-│       ├── HandTrack.js
-│       └── GestureRecognizer.js
-└── server/
-├── server.js
-├── db.js
-├── schema.sql
-├── env.example
-└── routes/
-├── auth.js
-├── datasets.js
-└── visualisations.js
----
-
-## Installation Guide
+## Installation
 
 ### Prerequisites
 
-Make sure you have the following installed before starting:
-
-- [Node.js](https://nodejs.org/) v18 or higher
-- [PostgreSQL](https://www.postgresql.org/download/) v18 or higher
-- A modern web browser (Chrome recommended for webcam gesture support)
+The only thing you need is [Docker Desktop](https://www.docker.com/products/docker-desktop/). No Node.js, no PostgreSQL, no database setup required.
 
 ---
 
-### Step 1 — Clone the Repository
+### Step 1 — Install Docker Desktop
+
+Download and install Docker Desktop from [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/)
+
+Make sure Docker Desktop is running before continuing. You will see the Docker whale icon in your system tray when it is ready.
+
+---
+
+### Step 2 — Clone the Repository
 
 ```bash
 git clone https://github.com/momo858/Data-Visualisations-
@@ -81,35 +59,79 @@ cd Data-Visualisations-
 
 ---
 
-### Step 2 — Set Up the Database
-
-Open a terminal and connect to PostgreSQL:
+### Step 3 — Start the Application
 
 ```bash
-psql -U postgres
+docker-compose up
 ```
 
-Create the database:
+The first run will take a few minutes as Docker downloads the required images. You will know it is ready when you see:
 
-```sql
-CREATE DATABASE hidv3d;
-\q
+Database tables ready.
+HIDV3D server running at http://localhost:3000
+
+---
+
+### Step 4 — Open the App
+
+Open your browser and go to:
+http://localhost:3000
+That is it. Docker automatically sets up Node.js, PostgreSQL, creates all the database tables, and serves the full application.
+
+---
+
+### Stopping the App
+
+```bash
+docker-compose down
 ```
 
 ---
 
-### Step 3 — Configure Environment Variables
-
-Navigate to the server folder:
+### Running Again After First Setup
 
 ```bash
-cd server
+docker-compose up
 ```
 
-Copy the example environment file:
+Subsequent runs start much faster because Docker caches the images.
 
-```bash
-cp env.example .env
-```
+---
 
-Open `.env` and fill in your PostgreSQL credentials:
+## Using the App
+
+1. Click **Upload CSV** to load a data file
+2. The system automatically detects columns and suggests the best axes
+3. Adjust the X, Y, Z, and Colour dropdowns if needed
+4. Click **Visualize Data** to generate the 3D scatter plot
+5. Use your mouse to orbit, zoom, and pan the scene
+6. Click **Hand Control** to activate webcam gesture control
+7. Register or log in to save and reload your visualisations
+8. Click **❓ Help** in the top nav for a quick guide
+
+---
+
+### Gesture Controls
+
+| Gesture | Action |
+|---------|--------|
+| ✋ Open palm | Rotate the scene |
+| ✊ Closed fist | Zoom out |
+| 🤏 allFingers together | Zoom in |
+
+> For best gesture recognition results, use the app in good lighting with a plain background behind your hand.
+
+---
+
+## Known Limitations
+
+- Performance may slow  with datasets above 5000 rows
+- Gesture recognition accuracy varies with lighting conditions
+- Sessions are stored in server memory and are lost on server restart
+- The app is designed for desktop browsers 
+
+---
+
+## GitHub
+
+[https://github.com/momo858/Data-Visualisations-](https://github.com/momo858/Data-Visualisations-)
