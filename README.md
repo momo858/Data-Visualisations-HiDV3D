@@ -117,7 +117,7 @@ Subsequent runs start much faster because Docker caches the images.
 |---------|--------|
 | ✋ Open palm | Rotate the scene |
 | ✊ Closed fist | Zoom out |
-| 🤏 allFingers together | Zoom in |
+| 🤏 All Fingers together | Zoom in |
 
 > For best gesture recognition results, use the app in good lighting with a plain background behind your hand.
 
