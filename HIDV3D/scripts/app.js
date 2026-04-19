@@ -414,6 +414,14 @@ document.addEventListener("DOMContentLoaded", function () {
     if (colorSelect && v.color_col) colorSelect.value = v.color_col;
 
     if (parsedCsvData) {
+      const currentColumns = columnDetector.getAllColumns().map(c => c.name);
+      if (!currentColumns.includes(v.x_col) || 
+          !currentColumns.includes(v.y_col) || 
+          !currentColumns.includes(v.z_col)) {
+        showToast('The loaded CSV does not match this saved visualisation. Please upload the correct file.', 'error');
+        return;
+      }
+
       viewer.initScene();
       viewer.visualizeData(parsedCsvData, v.x_col, v.y_col, v.z_col, v.color_col || null);
 
