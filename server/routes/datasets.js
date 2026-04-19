@@ -37,7 +37,7 @@ async function datasetsHandler(req, res) {
         return;
       }
 
-      // Works in both local PostgreSQL and Docker PostgreSQL
+      // Works in  Docker PostgreSQL
       const colValue = JSON.stringify(Array.isArray(columns) ? columns : (columns || []));
 
       const result = await db.query(

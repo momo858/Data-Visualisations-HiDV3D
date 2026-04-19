@@ -238,6 +238,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const file = event.target.files[0];
     if (!file) return;
 
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      showToast('Only CSV files are supported. Please upload a .csv file.', 'error');
+      csvInput.value = '';
+      return;
+    }
+
     Papa.parse(file, {
       header: true,
       dynamicTyping: true,
